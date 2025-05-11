@@ -1,7 +1,7 @@
 use super::super::{read_keypair_file, ClientConfig};
-use anchor_client::{Client, Cluster};
+use anchor_client::{solana_client::rpc_client::RpcClient, Client, Cluster};
+use anchor_spl::{associated_token::{get_associated_token_address, spl_associated_token_account::instruction::{create_associated_token_account, create_associated_token_account_idempotent}}, token::spl_token};
 use anyhow::Result;
-use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     account::WritableAccount,
     instruction::Instruction,
@@ -10,11 +10,11 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     system_instruction,
 };
+use spl_token_client::{spl_token_2022, token::ExtensionInitializationParams};
 use spl_token_2022::{
     extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensionsMut},
     state::{Account, Mint},
 };
-use spl_token_client::token::ExtensionInitializationParams;
 use std::{rc::Rc, str::FromStr};
 
 pub fn create_and_init_mint_instr(
@@ -103,7 +103,7 @@ pub fn create_ata_token_account_instr(
     let instructions = program
         .request()
         .instruction(
-            spl_associated_token_account::instruction::create_associated_token_account(
+            create_associated_token_account(
                 &program.payer(),
                 owner,
                 mint,
@@ -262,7 +262,7 @@ pub fn wrap_sol_instr(config: &ClientConfig, amount: u64) -> Result<Vec<Instruct
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
     let wsol_mint = Pubkey::from_str("So11111111111111111111111111111111111111112")?;
     let wsol_ata_account =
-        spl_associated_token_account::get_associated_token_address(&wallet_key, &wsol_mint);
+        get_associated_token_address(&wallet_key, &wsol_mint);
     // Client.
     let client = Client::new(url, Rc::new(payer));
     let program = client.program(spl_token::id())?;
@@ -270,7 +270,7 @@ pub fn wrap_sol_instr(config: &ClientConfig, amount: u64) -> Result<Vec<Instruct
     let instructions = program
         .request()
         .instruction(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+            create_associated_token_account_idempotent(
                 &program.payer(),
                 &wallet_key,
                 &wsol_mint,

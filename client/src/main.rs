@@ -1,38 +1,33 @@
 #![allow(dead_code)]
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
+use anchor_spl::{associated_token::{get_associated_token_address, spl_associated_token_account}, token::spl_token};
 use anyhow::{format_err, Result};
 use arrayref::array_ref;
+use bincode::{config::standard, encode_to_vec};
 use clap::Parser;
 use configparser::ini::Ini;
-use rand::rngs::OsRng;
-use solana_account_decoder::{
+use anchor_client::solana_account_decoder::{
     parse_token::{TokenAccountType, UiAccountState},
     UiAccountData, UiAccountEncoding,
 };
-use solana_client::{
+use anchor_client::solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTransactionConfig},
     rpc_filter::{Memcmp, RpcFilterType},
     rpc_request::TokenAccountsFilter,
 };
 use solana_sdk::{
-    commitment_config::CommitmentConfig,
-    compute_budget::ComputeBudgetInstruction,
-    message::Message,
-    program_pack::Pack,
-    pubkey::Pubkey,
-    signature::{Keypair, Signature, Signer},
-    transaction::Transaction,
+    bs58, commitment_config::CommitmentConfig, compute_budget::ComputeBudgetInstruction, message::Message, program_pack::Pack, pubkey::Pubkey, signature::{Keypair, Signature, Signer}, transaction::Transaction
 };
 use solana_transaction_status::UiTransactionEncoding;
+use spl_token_client::{spl_token_2022, token::ExtensionInitializationParams};
 use std::path::Path;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::{collections::VecDeque, convert::identity, mem::size_of};
 
 mod instructions;
-use bincode::serialize;
 use instructions::amm_instructions::*;
 use instructions::events_instructions_parse::*;
 use instructions::rpc::*;
@@ -42,13 +37,11 @@ use raydium_amm_v3::{
     libraries::{fixed_point_64, liquidity_math, tick_math},
     states::{PoolState, TickArrayBitmapExtension, TickArrayState, POOL_TICK_ARRAY_BITMAP_SEED},
 };
-use spl_associated_token_account::get_associated_token_address;
-use spl_token_2022::{
+use spl_token_client::spl_token_2022::{
     extension::StateWithExtensions,
     state::Mint,
     state::{Account, AccountState},
 };
-use spl_token_client::token::ExtensionInitializationParams;
 
 use crate::instructions::utils;
 #[derive(Clone, Debug, PartialEq)]
@@ -641,7 +634,7 @@ fn main() -> Result<()> {
                 });
             }
 
-            let mint = Keypair::generate(&mut OsRng);
+            let mint = Keypair::new();
             let create_and_init_instr = create_and_init_mint_instr(
                 &pool_config.clone(),
                 token_program,
@@ -669,7 +662,7 @@ fn main() -> Result<()> {
             not_ata,
         } => {
             let mut signers = vec![&payer];
-            let auxiliary_token_keypair = Keypair::generate(&mut OsRng);
+            let auxiliary_token_keypair = Keypair::new();
             let create_ata_instr = if not_ata {
                 signers.push(&auxiliary_token_keypair);
                 create_and_init_auxiliary_token(
@@ -1040,7 +1033,7 @@ fn main() -> Result<()> {
                     transfer_reward_owner_instrs[0].data
                 );
                 let message = Message::new(&transfer_reward_owner_instrs, None);
-                let serialize_data = serialize(&message).unwrap();
+                let serialize_data = encode_to_vec(&message.serialize(), standard()).unwrap();
                 let raw_data = bs58::encode(serialize_data).into_string();
                 println!("raw_data:{:?}", raw_data);
             } else {
@@ -1187,7 +1180,7 @@ fn main() -> Result<()> {
             if find_position.nft_mint == Pubkey::default() {
                 // personal position not exist
                 // new nft mint
-                let nft_mint = Keypair::generate(&mut OsRng);
+                let nft_mint = Keypair::new();
                 let mut remaining_accounts = Vec::new();
                 remaining_accounts.push(AccountMeta::new(
                     pool_config.tickarray_bitmap_extension.unwrap(),
@@ -2130,6 +2123,7 @@ fn main() -> Result<()> {
                         ..RpcAccountInfoConfig::default()
                     },
                     with_context: Some(false),
+                    sort_results: Some(false),
                 },
             )?;
 
@@ -2188,6 +2182,7 @@ fn main() -> Result<()> {
                         ..RpcAccountInfoConfig::default()
                     },
                     with_context: Some(false),
+                    sort_results: Some(false),
                 },
             )?;
 
@@ -2225,6 +2220,7 @@ fn main() -> Result<()> {
                         ..RpcAccountInfoConfig::default()
                     },
                     with_context: Some(false),
+                    sort_results: Some(false),
                 },
             )?;
 

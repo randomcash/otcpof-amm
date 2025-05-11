@@ -5,9 +5,10 @@ use crate::states::*;
 use crate::util::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
+use anchor_lang::system_program;
 use anchor_lang::system_program::{transfer, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::Metadata;
+use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use anchor_spl::token_2022::spl_token_2022::extension::{
     BaseStateWithExtensions, StateWithExtensions,
@@ -18,7 +19,8 @@ use anchor_spl::token_2022::{
     spl_token_2022::{self, instruction::AuthorityType},
 };
 use anchor_spl::token_interface;
-use mpl_token_metadata::{instruction::create_metadata_accounts_v3, state::Creator};
+use anchor_spl::token_interface::spl_token_metadata_interface;
+use mpl_token_metadata::types::DataV2;
 use std::cell::RefMut;
 #[cfg(feature = "enable-log")]
 use std::convert::identity;
@@ -151,9 +153,9 @@ pub struct OpenPosition<'info> {
     /// Program to create an ATA for receiving position NFT
     pub associated_token_program: Program<'info, AssociatedToken>,
 
-    /// Program to create NFT metadata
-    /// CHECK: Metadata program address constraint applied
-    pub metadata_program: Program<'info, Metadata>,
+    // /// Program to create NFT metadata
+    // /// CHECK: Metadata program address constraint applied
+    //pub metadata_program: Program<'info, Metadata>,
     // remaining account
     // #[account(
     //     seeds = [
@@ -196,7 +198,7 @@ pub fn open_position_v1<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.system_program,
         &ctx.accounts.token_program,
         &ctx.accounts.associated_token_program,
-        Some(&ctx.accounts.metadata_program),
+        //Some(&ctx.accounts.metadata_program),
         None,
         None,
         None,
@@ -235,7 +237,7 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     system_program: &'b Program<'info, System>,
     token_program: &'b Program<'info, Token>,
     _associated_token_program: &'b Program<'info, AssociatedToken>,
-    metadata_program: Option<&'b Program<'info, Metadata>>,
+    //metadata_program: Option<&'b Program<'info, Metadata>>,
     token_program_2022: Option<&'b Program<'info, Token2022>>,
     vault_0_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
     vault_1_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
@@ -388,7 +390,7 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
         position_nft_mint,
         position_nft_account,
         metadata_account,
-        metadata_program,
+        //metadata_program,
         token_program,
         token_program_2022,
         system_program,
@@ -733,7 +735,7 @@ fn mint_nft_and_remove_mint_authority<'info>(
     position_nft_mint: &AccountInfo<'info>,
     position_nft_account: &AccountInfo<'info>,
     metadata_account: Option<&UncheckedAccount<'info>>,
-    metadata_program: Option<&Program<'info, Metadata>>,
+    //metadata_program: Option<&Program<'info, Metadata>>,
     token_program: &Program<'info, Token>,
     token_program_2022: Option<&Program<'info, Token2022>>,
     system_program: &Program<'info, System>,
@@ -772,7 +774,7 @@ fn mint_nft_and_remove_mint_authority<'info>(
                 &pool_state_info,
                 &position_nft_mint_info,
                 metadata_account.unwrap(),
-                metadata_program.unwrap(),
+                //metadata_program.unwrap(),
                 system_program,
                 rent,
                 name,
@@ -827,7 +829,7 @@ fn initialize_metadata_account<'info>(
     authority: &AccountInfo<'info>,
     position_nft_mint: &AccountInfo<'info>,
     metadata_account: &UncheckedAccount<'info>,
-    metadata_program: &Program<'info, Metadata>,
+    //metadata_program: &Program<'info, Metadata>,
     system_program: &Program<'info, System>,
     rent: &Sysvar<'info, Rent>,
     name: String,
@@ -835,30 +837,45 @@ fn initialize_metadata_account<'info>(
     uri: String,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<()> {
-    let create_metadata_ix = create_metadata_accounts_v3(
-        metadata_program.key(),
-        metadata_account.key(),
-        position_nft_mint.key(),
-        authority.key(),
-        payer.key(),
-        authority.key(),
+    let data_v2_instruction = DataV2 {
         name,
         symbol,
         uri,
-        Some(vec![Creator {
+        seller_fee_basis_points: 0,
+        creators: Some(vec![Creator {
             address: authority.key(),
             verified: true,
             share: 100,
         }]),
-        0,
-        true,
-        false,
-        None,
-        None,
-        None,
-    );
+        collection: None,
+        uses: None,
+    };
+
+    let accounts = vec![
+        AccountMeta::new(metadata_account.key(), false),
+        AccountMeta::new_readonly(position_nft_mint.key(), false),
+        AccountMeta::new_readonly(authority.key(), true),
+        AccountMeta::new(payer.key(), true),
+        AccountMeta::new_readonly(authority.key(), true),
+        AccountMeta::new_readonly(system_program::ID, false),
+    ];
+
+    //No need to pass program_id, as its defined inside CreateMetadataAccountV3Builder
+    let create_metadata_instruction =
+        mpl_token_metadata::instructions::CreateMetadataAccountV3Builder::new()
+            .metadata(metadata_account.key())
+            .mint(position_nft_mint.key())
+            .mint_authority(authority.key())
+            .payer(payer.key())
+            .update_authority(authority.key(), true)
+            .system_program(system_program::ID)
+            .rent(Some(rent.key()))
+            .data(data_v2_instruction)
+            .add_remaining_accounts(&accounts)
+            .instruction();
+
     solana_program::program::invoke_signed(
-        &create_metadata_ix,
+        &create_metadata_instruction,
         &[
             metadata_account.to_account_info(),
             position_nft_mint.to_account_info(),
@@ -884,7 +901,7 @@ pub fn initialize_token_metadata_extension<'info>(
     uri: String,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<()> {
-    let metadata = spl_token_metadata_interface::state::TokenMetadata {
+    let metadata = token_interface::spl_token_metadata_interface::state::TokenMetadata {
         name,
         symbol,
         uri,
@@ -894,8 +911,7 @@ pub fn initialize_token_metadata_extension<'info>(
     let mint_data = position_nft_mint.try_borrow_data()?;
     let mint_state_unpacked =
         StateWithExtensions::<spl_token_2022::state::Mint>::unpack(&mint_data)?;
-    let new_account_len = mint_state_unpacked
-        .try_get_new_account_len::<spl_token_metadata_interface::state::TokenMetadata>(&metadata)?;
+    let new_account_len = mint_state_unpacked.try_get_account_len()?;
     let new_rent_exempt_lamports = Rent::get()?.minimum_balance(new_account_len);
     let additional_lamports = new_rent_exempt_lamports.saturating_sub(position_nft_mint.lamports());
     // CPI call will borrow the account data

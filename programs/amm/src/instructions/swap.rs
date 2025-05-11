@@ -556,7 +556,7 @@ pub fn exact_internal<'b, 'c: 'info, 'info>(
     sqrt_price_limit_x64: u128,
     is_base_input: bool,
 ) -> Result<u64> {
-    let block_timestamp = solana_program::clock::Clock::get()?.unix_timestamp as u64;
+    let block_timestamp = Clock::get()?.unix_timestamp as u64;
 
     let amount_0;
     let amount_1;
@@ -1049,12 +1049,12 @@ mod swap_test {
 
             use std::convert::identity;
             if zero_for_one {
-                tick_array_states.make_contiguous().sort_by(|a, b| {
+                tick_array_states.make_contiguous().sort_unstable_by(|a, b| {
                     identity(b.borrow().start_tick_index)
                         .cmp(&identity(a.borrow().start_tick_index))
                 });
             } else {
-                tick_array_states.make_contiguous().sort_by(|a, b| {
+                tick_array_states.make_contiguous().sort_unstable_by(|a, b| {
                     identity(a.borrow().start_tick_index)
                         .cmp(&identity(b.borrow().start_tick_index))
                 });
@@ -2320,6 +2320,7 @@ mod swap_test {
     mod sqrt_price_limit_optimization_test {
         use super::*;
         use proptest::prelude::*;
+        use rand::Rng;
         use std::{convert::identity, u64};
 
         use proptest::prop_assume;
@@ -2347,8 +2348,8 @@ mod swap_test {
                         );
 
                     prop_assume!(sum_amount_1 > 1);
-                    let mut rng = rand::thread_rng();
-                    let amount_specified  = rng.gen_range(1..u64::MAX - sum_amount_0);
+                    let mut rng = rand::rng();
+                    let amount_specified  = rng.random_range(1..u64::MAX - sum_amount_0);
 
                     let result = swap_internal(
                         &amm_config,
@@ -2438,8 +2439,8 @@ mod swap_test {
                     );
 
                     prop_assume!(sum_amount_1 > 1);
-                    let mut rng = rand::thread_rng();
-                    let amount_specified  = rng.gen_range(1..sum_amount_1);
+                    let mut rng = rand::rng();
+                    let amount_specified  = rng.random_range(1..sum_amount_1);
                     // println!("----- input: tick_current:{}, amount_0:{}, amount_1:{}, amount_specified:{},tick_lower:{}, tick_upper:{}", tick_current, amount_0, amount_1,amount_specified, tick_lower, tick_upper);
                     let result = swap_internal(
                         &amm_config,
@@ -2530,8 +2531,8 @@ mod swap_test {
                     );
 
                     prop_assume!(sum_amount_0 > 1);
-                    let mut rng = rand::thread_rng();
-                    let amount_specified  = rng.gen_range(1..u64::MAX - sum_amount_1);
+                    let mut rng = rand::rng();
+                    let amount_specified  = rng.random_range(1..u64::MAX - sum_amount_1);
 
                     let result = swap_internal(
                         &amm_config,
@@ -2621,8 +2622,8 @@ mod swap_test {
                         zero_for_one
                     );
                     prop_assume!(sum_amount_0 > 1);
-                    let mut rng = rand::thread_rng();
-                    let amount_specified  = rng.gen_range(1..sum_amount_0);
+                    let mut rng = rand::rng();
+                    let amount_specified  = rng.random_range(1..sum_amount_0);
 
                     let result = swap_internal(
                         &amm_config,

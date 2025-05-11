@@ -225,7 +225,7 @@ mod muldiv_u64_tests {
     struct NonZero(u64);
 
     impl Arbitrary for NonZero {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        fn arbitrary(g: &mut Gen) -> Self {
             loop {
                 let v = u64::arbitrary(g);
                 if v != 0 {
@@ -279,7 +279,7 @@ mod muldiv_u128_tests {
     struct NonZero(U128);
 
     impl Arbitrary for NonZero {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        fn arbitrary(g: &mut Gen) -> Self {
             loop {
                 let v = U128::from(u128::arbitrary(g));
                 if v != U128::default() {
@@ -290,7 +290,7 @@ mod muldiv_u128_tests {
     }
 
     impl Arbitrary for U128 {
-        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        fn arbitrary(g: &mut Gen) -> Self {
             loop {
                 let v = U128::from(u128::arbitrary(g));
                 if v != U128::default() {

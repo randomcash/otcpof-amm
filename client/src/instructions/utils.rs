@@ -3,9 +3,10 @@ use anyhow::Result;
 use raydium_amm_v3::libraries::fixed_point_64;
 use raydium_amm_v3::libraries::*;
 use raydium_amm_v3::states::*;
-use solana_client::rpc_client::RpcClient;
+use anchor_client::solana_client::rpc_client::RpcClient;
+use solana_sdk::program_pack::Pack;
 use solana_sdk::{account::Account, pubkey::Pubkey};
-use spl_token_2022::{
+use spl_token_client::spl_token_2022::{
     extension::{
         confidential_transfer::{ConfidentialTransferAccount, ConfidentialTransferMint},
         cpi_guard::CpiGuard,
@@ -118,7 +119,7 @@ pub fn get_pool_mints_transfer_fee(
 }
 
 /// Calculate the fee for output amount
-pub fn get_transfer_inverse_fee<'data, S: BaseState>(
+pub fn get_transfer_inverse_fee<'data, S: BaseState + Pack>(
     account_state: &StateWithExtensions<'data, S>,
     epoch: u64,
     post_fee_amount: u64,
@@ -139,7 +140,7 @@ pub fn get_transfer_inverse_fee<'data, S: BaseState>(
 }
 
 /// Calculate the fee for input amount
-pub fn get_transfer_fee<'data, S: BaseState>(
+pub fn get_transfer_fee<'data, S: BaseState + Pack>(
     account_state: &StateWithExtensions<'data, S>,
     epoch: u64,
     pre_fee_amount: u64,
@@ -154,7 +155,7 @@ pub fn get_transfer_fee<'data, S: BaseState>(
     fee
 }
 
-pub fn get_account_extensions<'data, S: BaseState>(
+pub fn get_account_extensions<'data, S: BaseState + Pack>(
     account_state: &StateWithExtensions<'data, S>,
 ) -> Vec<ExtensionStruct> {
     let mut extensions: Vec<ExtensionStruct> = Vec::new();

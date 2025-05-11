@@ -1,13 +1,12 @@
 use anyhow::{anyhow, Result};
-use solana_client::{
+use anchor_client::solana_client::{
     rpc_client::RpcClient,
     rpc_config::RpcSendTransactionConfig,
     rpc_request::RpcRequest,
     rpc_response::{RpcResult, RpcSimulateTransactionResult},
 };
 use solana_sdk::{
-    account::Account, commitment_config::CommitmentConfig, program_pack::Pack as TokenPack,
-    pubkey::Pubkey, signature::Signature, transaction::Transaction,
+    account::Account, bs58, commitment_config::CommitmentConfig, packet::Encode, program_pack::Pack as TokenPack, pubkey::Pubkey, signature::Signature, transaction::Transaction
 };
 use std::convert::Into;
 
@@ -17,7 +16,10 @@ pub fn simulate_transaction(
     sig_verify: bool,
     cfg: CommitmentConfig,
 ) -> RpcResult<RpcSimulateTransactionResult> {
-    let serialized_encoded = bs58::encode(bincode::serialize(transaction).unwrap()).into_string();
+    let mut buffer = Vec::new();
+    transaction.encode(&mut buffer).unwrap();
+
+    let serialized_encoded = bs58::encode(&mut buffer).into_string();
     client.send(
         RpcRequest::SimulateTransaction,
         serde_json::json!([serialized_encoded, {

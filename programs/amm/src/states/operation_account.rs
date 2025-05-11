@@ -40,7 +40,7 @@ impl OperationState {
         operation_owners.retain(|&item| item != Pubkey::default());
         let owners_set: HashSet<Pubkey> = HashSet::from_iter(operation_owners.iter().cloned());
         let mut updated_owner: Vec<Pubkey> = owners_set.into_iter().collect();
-        updated_owner.sort_by(|a, b| a.cmp(b));
+        updated_owner.sort_unstable_by(|a, b| a.cmp(b));
         // clear
         self.operation_owners = [Pubkey::default(); OPERATION_SIZE_USIZE];
         // update
@@ -227,7 +227,7 @@ mod test {
         let mut operation_data =
             [0u8; 8 + 1 + 32 * OPERATION_SIZE_USIZE + 32 * WHITE_MINT_SIZE_USIZE];
         let mut offset = 0;
-        operation_data[offset..offset + 8].copy_from_slice(&OperationState::discriminator());
+        operation_data[offset..offset + 8].copy_from_slice(&OperationState::DISCRIMINATOR);
         offset += 8;
         operation_data[offset..offset + 1].copy_from_slice(&bump.to_le_bytes());
         offset += 1;

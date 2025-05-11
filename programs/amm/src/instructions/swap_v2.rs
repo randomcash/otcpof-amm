@@ -86,7 +86,7 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
 ) -> Result<u64> {
     // invoke_memo_instruction(SWAP_MEMO_MSG, ctx.memo_program.to_account_info())?;
 
-    let block_timestamp = solana_program::clock::Clock::get()?.unix_timestamp as u64;
+    let block_timestamp = Clock::get()?.unix_timestamp as u64;
 
     let amount_0;
     let amount_1;

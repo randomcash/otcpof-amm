@@ -1,7 +1,10 @@
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
+use anchor_spl::associated_token::get_associated_token_address;
+use anchor_spl::associated_token::spl_associated_token_account;
+use anchor_spl::token::spl_token;
+use anchor_spl::token_2022::spl_token_2022;
 use anyhow::Result;
-use mpl_token_metadata::state::PREFIX as MPL_PREFIX;
 use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Signer, system_program, sysvar,
 };
@@ -220,14 +223,14 @@ pub fn open_position_instr(
     let client = Client::new(url, Rc::new(payer));
     let program = client.program(config.raydium_v3_program)?;
     let nft_ata_token_account =
-        spl_associated_token_account::get_associated_token_address(&program.payer(), &nft_mint_key);
+        get_associated_token_address(&program.payer(), &nft_mint_key);
     let (metadata_account_key, _bump) = Pubkey::find_program_address(
         &[
-            MPL_PREFIX.as_bytes(),
-            mpl_token_metadata::id().to_bytes().as_ref(),
+            mpl_token_metadata::accounts::Metadata::PREFIX,
+            mpl_token_metadata::ID.to_bytes().as_ref(),
             nft_mint_key.to_bytes().as_ref(),
         ],
-        &mpl_token_metadata::id(),
+        &mpl_token_metadata::ID,
     );
     let (protocol_position_key, __bump) = Pubkey::find_program_address(
         &[
@@ -279,7 +282,6 @@ pub fn open_position_instr(
             system_program: system_program::id(),
             token_program: spl_token::id(),
             associated_token_program: spl_associated_token_account::id(),
-            metadata_program: mpl_token_metadata::id(),
             token_program_2022: spl_token_2022::id(),
             vault_0_mint: token_mint_0,
             vault_1_mint: token_mint_1,

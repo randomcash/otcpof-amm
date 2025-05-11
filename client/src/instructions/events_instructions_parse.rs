@@ -8,6 +8,7 @@ use raydium_amm_v3::instruction;
 use raydium_amm_v3::instructions::*;
 use raydium_amm_v3::states::*;
 use regex::Regex;
+use solana_sdk::bs58;
 use solana_transaction_status::{
     option_serializer::OptionSerializer, EncodedTransaction, UiTransactionStatusMeta,
 };
@@ -138,7 +139,7 @@ pub fn handle_program_log(
             slice = &slice[8..];
             disc
         };
-        match disc {
+        match disc.as_slice() {
             ConfigChangeEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<ConfigChangeEvent>(&mut slice)?);
             }
@@ -347,7 +348,7 @@ pub fn handle_program_instruction(
     };
     // println!("{:?}", disc);
 
-    match disc {
+    match disc.as_slice() {
         instruction::CreateAmmConfig::DISCRIMINATOR => {
             let ix = decode_instruction::<instruction::CreateAmmConfig>(&mut ix_data).unwrap();
             #[derive(Debug)]

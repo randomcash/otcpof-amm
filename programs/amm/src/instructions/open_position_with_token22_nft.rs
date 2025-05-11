@@ -196,7 +196,7 @@ pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.system_program,
         &ctx.accounts.token_program,
         &ctx.accounts.associated_token_program,
-        None,
+        //None,
         Some(&ctx.accounts.token_program_2022),
         Some(ctx.accounts.vault_0_mint.clone()),
         Some(ctx.accounts.vault_1_mint.clone()),

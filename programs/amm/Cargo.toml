@@ -3,7 +3,7 @@ name = "raydium-amm-v3"
 version = "0.1.0"
 description = "Anchor client and source for Raydium concentrated liquidity AMM"
 edition = "2021"
-keywords = ["solana", "anchor", "raydium"]
+keywords = ["solana", "anchor"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -21,23 +21,25 @@ init_if_needed = []
 enable-log = []
 devnet = []
 paramset = []
+anchor-debug = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.29.0", features = ["metadata"] }
-solana-program = "<1.17.0"
-spl-memo = "4.0.0"
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.1", features = ["metadata"] }
+proc-macro2 = "1.0.94"
+pyth-sdk-solana = "0.10.4"
+spl-memo = "6.0.0"
 uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
-mpl-token-metadata = { version = "^1.11.0", features = ["no-entrypoint"] }
-spl-token-metadata-interface = { version = "=0.2.0" }
-bytemuck = { version = "1.19.0", features = ["derive", "min_const_generics"] }
-arrayref = { version = "0.3.6" }
+bytemuck = { version = "1.23.0", features = ["derive", "min_const_generics"] }
+arrayref = { version = "0.3.9" }
+mpl-token-metadata = "5.1.0"
 solana-security-txt = "1.1.1"
 
 [dev-dependencies]
-quickcheck = "0.9"
+quickcheck = "1.0.3"
 proptest = "1.0"
-rand = "0.8.5"
+rand = "0.9.1"
 
 [profile.release]
 lto = "fat"

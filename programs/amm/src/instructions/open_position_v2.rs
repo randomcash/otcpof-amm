@@ -2,7 +2,6 @@ use super::open_position::open_position;
 use crate::states::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::Metadata;
 use anchor_spl::token::{self, Token};
 use anchor_spl::token_interface::{Mint, Token2022, TokenAccount};
 #[derive(Accounts)]
@@ -130,9 +129,10 @@ pub struct OpenPositionV2<'info> {
     /// Program to create an ATA for receiving position NFT
     pub associated_token_program: Program<'info, AssociatedToken>,
 
-    /// Program to create NFT metadata
-    /// CHECK: Metadata program address constraint applied
-    pub metadata_program: Program<'info, Metadata>,
+    // /// Program to create NFT metadata
+    // /// CHECK: Metadata program address constraint applied
+    // pub metadata_program: Program<'info, Metadata>,
+    
     /// Program to create mint account and mint tokens
     pub token_program_2022: Program<'info, Token2022>,
     /// The mint of token vault 0
@@ -187,7 +187,7 @@ pub fn open_position_v2<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.system_program,
         &ctx.accounts.token_program,
         &ctx.accounts.associated_token_program,
-        Some(&ctx.accounts.metadata_program),
+        //Some(&ctx.accounts.metadata_program),
         Some(&ctx.accounts.token_program_2022),
         Some(ctx.accounts.vault_0_mint.clone()),
         Some(ctx.accounts.vault_1_mint.clone()),
