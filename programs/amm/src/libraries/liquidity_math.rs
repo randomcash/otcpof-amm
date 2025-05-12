@@ -2,7 +2,6 @@ use super::big_num::U128;
 use super::big_num::U256;
 use super::fixed_point_64;
 use super::full_math::MulDiv;
-use super::tick_math;
 use super::unsafe_math::UnsafeMathTrait;
 use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
@@ -273,44 +272,4 @@ pub fn get_delta_amount_1_signed(
             true,
         )
     }
-}
-
-pub fn get_delta_amounts_signed(
-    tick_current: i32,
-    sqrt_price_x64_current: u128,
-    tick_lower: i32,
-    tick_upper: i32,
-    liquidity_delta: i128,
-) -> Result<(u64, u64)> {
-    let mut amount_0 = 0;
-    let mut amount_1 = 0;
-    if tick_current < tick_lower {
-        amount_0 = get_delta_amount_0_signed(
-            tick_math::get_sqrt_price_at_tick(tick_lower)?,
-            tick_math::get_sqrt_price_at_tick(tick_upper)?,
-            liquidity_delta,
-        )
-        .unwrap();
-    } else if tick_current < tick_upper {
-        amount_0 = get_delta_amount_0_signed(
-            sqrt_price_x64_current,
-            tick_math::get_sqrt_price_at_tick(tick_upper)?,
-            liquidity_delta,
-        )
-        .unwrap();
-        amount_1 = get_delta_amount_1_signed(
-            tick_math::get_sqrt_price_at_tick(tick_lower)?,
-            sqrt_price_x64_current,
-            liquidity_delta,
-        )
-        .unwrap();
-    } else {
-        amount_1 = get_delta_amount_1_signed(
-            tick_math::get_sqrt_price_at_tick(tick_lower)?,
-            tick_math::get_sqrt_price_at_tick(tick_upper)?,
-            liquidity_delta,
-        )
-        .unwrap();
-    }
-    Ok((amount_0, amount_1))
 }

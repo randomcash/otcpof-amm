@@ -1,9 +1,4 @@
-use std::collections::VecDeque;
-use std::ops::Deref;
-
 use crate::error::ErrorCode;
-use crate::libraries::tick_math;
-use crate::swap::swap_internal;
 use crate::util::*;
 use crate::{states::*, util};
 use anchor_lang::prelude::*;
@@ -79,7 +74,7 @@ pub struct SwapSingleV2<'info> {
 /// if is_base_input = true, return value is the max_amount_out, otherwise is min_amount_in
 pub fn exact_internal_v2<'c: 'info, 'info>(
     ctx: &mut SwapSingleV2<'info>,
-    remaining_accounts: &'c [AccountInfo<'info>],
+    _remaining_accounts: &'c [AccountInfo<'info>],
     amount_specified: u64,
     sqrt_price_limit_x64: u128,
     is_base_input: bool,
@@ -88,8 +83,8 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
 
     let block_timestamp = Clock::get()?.unix_timestamp as u64;
 
-    let amount_0;
-    let amount_1;
+    let amount_0 = 0;   //TODO: calculate this
+    let amount_1 = 0;
     let zero_for_one;
     let swap_price_before;
 
@@ -97,7 +92,7 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
     let output_balance_before = ctx.output_token_account.amount;
 
     // calculate specified amount because the amount includes transfer_fee as input and without transfer_fee as output
-    let amount_calculate_specified = if is_base_input {
+    let _amount_calculate_specified = if is_base_input {
         let transfer_fee =
             util::get_transfer_fee(ctx.input_vault_mint.clone(), amount_specified).unwrap();
         amount_specified - transfer_fee
@@ -126,23 +121,7 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
             ErrorCode::InvalidInputPoolVault
         );
 
-        let mut tickarray_bitmap_extension = None;
-        let tick_array_states = &mut VecDeque::new();
-
-        let tick_array_bitmap_extension_key = TickArrayBitmapExtension::key(pool_state.key());
-        for account_info in remaining_accounts.into_iter() {
-            if account_info.key().eq(&tick_array_bitmap_extension_key) {
-                tickarray_bitmap_extension = Some(
-                    *(AccountLoader::<TickArrayBitmapExtension>::try_from(account_info)?
-                        .load()?
-                        .deref()),
-                );
-                continue;
-            }
-            tick_array_states.push_back(AccountLoad::load_data_mut(account_info)?);
-        }
-
-        (amount_0, amount_1) = swap_internal(
+        /* (amount_0, amount_1) = swap_internal(
             &ctx.amm_config,
             pool_state,
             tick_array_states,
@@ -161,7 +140,7 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
             zero_for_one,
             is_base_input,
             oracle::block_timestamp(),
-        )?;
+        )?; */
 
         #[cfg(feature = "enable-log")]
         msg!(
@@ -298,7 +277,6 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
         zero_for_one,
         sqrt_price_x64: pool_state.sqrt_price_x64,
         liquidity: pool_state.liquidity,
-        tick: pool_state.tick_current
     });
     if zero_for_one {
         require_gt!(swap_price_before, pool_state.sqrt_price_x64);

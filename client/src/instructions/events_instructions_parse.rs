@@ -354,7 +354,6 @@ pub fn handle_program_instruction(
             #[derive(Debug)]
             pub struct CreateAmmConfig {
                 pub index: u16,
-                pub tick_spacing: u16,
                 pub trade_fee_rate: u32,
                 pub protocol_fee_rate: u32,
                 pub fund_fee_rate: u32,
@@ -363,7 +362,6 @@ pub fn handle_program_instruction(
                 fn from(instr: instruction::CreateAmmConfig) -> CreateAmmConfig {
                     CreateAmmConfig {
                         index: instr.index,
-                        tick_spacing: instr.tick_spacing,
                         trade_fee_rate: instr.trade_fee_rate,
                         protocol_fee_rate: instr.protocol_fee_rate,
                         fund_fee_rate: instr.fund_fee_rate,
@@ -565,10 +563,6 @@ pub fn handle_program_instruction(
             let ix = decode_instruction::<instruction::OpenPosition>(&mut ix_data).unwrap();
             #[derive(Debug)]
             pub struct OpenPosition {
-                pub tick_lower_index: i32,
-                pub tick_upper_index: i32,
-                pub tick_array_lower_start_index: i32,
-                pub tick_array_upper_start_index: i32,
                 pub liquidity: u128,
                 pub amount_0_max: u64,
                 pub amount_1_max: u64,
@@ -576,10 +570,6 @@ pub fn handle_program_instruction(
             impl From<instruction::OpenPosition> for OpenPosition {
                 fn from(instr: instruction::OpenPosition) -> OpenPosition {
                     OpenPosition {
-                        tick_lower_index: instr.tick_lower_index,
-                        tick_upper_index: instr.tick_upper_index,
-                        tick_array_lower_start_index: instr.tick_array_lower_start_index,
-                        tick_array_upper_start_index: instr.tick_array_upper_start_index,
                         liquidity: instr.liquidity,
                         amount_0_max: instr.amount_0_max,
                         amount_1_max: instr.amount_1_max,
@@ -592,10 +582,6 @@ pub fn handle_program_instruction(
             let ix = decode_instruction::<instruction::OpenPositionV2>(&mut ix_data).unwrap();
             #[derive(Debug)]
             pub struct OpenPositionV2 {
-                pub tick_lower_index: i32,
-                pub tick_upper_index: i32,
-                pub tick_array_lower_start_index: i32,
-                pub tick_array_upper_start_index: i32,
                 pub liquidity: u128,
                 pub amount_0_max: u64,
                 pub amount_1_max: u64,
@@ -605,10 +591,6 @@ pub fn handle_program_instruction(
             impl From<instruction::OpenPositionV2> for OpenPositionV2 {
                 fn from(instr: instruction::OpenPositionV2) -> OpenPositionV2 {
                     OpenPositionV2 {
-                        tick_lower_index: instr.tick_lower_index,
-                        tick_upper_index: instr.tick_upper_index,
-                        tick_array_lower_start_index: instr.tick_array_lower_start_index,
-                        tick_array_upper_start_index: instr.tick_array_upper_start_index,
                         liquidity: instr.liquidity,
                         amount_0_max: instr.amount_0_max,
                         amount_1_max: instr.amount_1_max,

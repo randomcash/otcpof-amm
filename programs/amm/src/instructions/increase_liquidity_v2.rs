@@ -25,8 +25,6 @@ pub struct IncreaseLiquidityV2<'info> {
         seeds = [
             POSITION_SEED.as_bytes(),
             pool_state.key().as_ref(),
-            &personal_position.tick_lower_index.to_be_bytes(),
-            &personal_position.tick_upper_index.to_be_bytes(),
         ],
         bump,
         constraint = protocol_position.pool_id == pool_state.key(),
@@ -36,14 +34,6 @@ pub struct IncreaseLiquidityV2<'info> {
     /// Increase liquidity for this position
     #[account(mut, constraint = personal_position.pool_id == pool_state.key())]
     pub personal_position: Box<Account<'info, PersonalPositionState>>,
-
-    /// Stores init state for the lower tick
-    #[account(mut, constraint = tick_array_lower.load()?.pool_id == pool_state.key())]
-    pub tick_array_lower: AccountLoader<'info, TickArrayState>,
-
-    /// Stores init state for the upper tick
-    #[account(mut, constraint = tick_array_upper.load()?.pool_id == pool_state.key())]
-    pub tick_array_upper: AccountLoader<'info, TickArrayState>,
 
     /// The payer's token account for token_0
     #[account(
@@ -113,8 +103,6 @@ pub fn increase_liquidity_v2<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.pool_state,
         &mut ctx.accounts.protocol_position,
         &mut ctx.accounts.personal_position,
-        &ctx.accounts.tick_array_lower,
-        &ctx.accounts.tick_array_upper,
         &ctx.accounts.token_account_0.to_account_info(),
         &ctx.accounts.token_account_1.to_account_info(),
         &ctx.accounts.token_vault_0.to_account_info(),

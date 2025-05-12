@@ -56,30 +56,6 @@ pub struct OpenPositionV2<'info> {
     )]
     pub protocol_position: Box<Account<'info, ProtocolPositionState>>,
 
-    /// CHECK: Account to store data for the position's lower tick
-    #[account(
-        mut,
-        seeds = [
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_state.key().as_ref(),
-            &tick_array_lower_start_index.to_be_bytes(),
-        ],
-        bump,
-    )]
-    pub tick_array_lower: UncheckedAccount<'info>,
-
-    /// CHECK: Account to store data for the position's upper tick
-    #[account(
-        mut,
-        seeds = [
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_state.key().as_ref(),
-            &tick_array_upper_start_index.to_be_bytes(),
-        ],
-        bump,
-    )]
-    pub tick_array_upper: UncheckedAccount<'info>,
-
     /// personal position state
     #[account(
         init,
@@ -161,10 +137,6 @@ pub fn open_position_v2<'a, 'b, 'c: 'info, 'info>(
     liquidity: u128,
     amount_0_max: u64,
     amount_1_max: u64,
-    tick_lower_index: i32,
-    tick_upper_index: i32,
-    tick_array_lower_start_index: i32,
-    tick_array_upper_start_index: i32,
     with_metadata: bool,
     base_flag: Option<bool>,
 ) -> Result<()> {
@@ -175,8 +147,6 @@ pub fn open_position_v2<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.position_nft_account.to_account_info(),
         Some(&ctx.accounts.metadata_account),
         &ctx.accounts.pool_state,
-        &ctx.accounts.tick_array_lower,
-        &ctx.accounts.tick_array_upper,
         &mut ctx.accounts.protocol_position,
         &mut ctx.accounts.personal_position,
         &ctx.accounts.token_account_0.to_account_info(),
@@ -197,10 +167,6 @@ pub fn open_position_v2<'a, 'b, 'c: 'info, 'info>(
         liquidity,
         amount_0_max,
         amount_1_max,
-        tick_lower_index,
-        tick_upper_index,
-        tick_array_lower_start_index,
-        tick_array_upper_start_index,
         with_metadata,
         base_flag,
         false,

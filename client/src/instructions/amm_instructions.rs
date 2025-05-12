@@ -13,7 +13,6 @@ use raydium_amm_v3::accounts as raydium_accounts;
 use raydium_amm_v3::instruction as raydium_instruction;
 use raydium_amm_v3::states::{
     AMM_CONFIG_SEED, OBSERVATION_SEED, OPERATION_SEED, POOL_SEED, POOL_VAULT_SEED, POSITION_SEED,
-    TICK_ARRAY_SEED,
 };
 use std::rc::Rc;
 
@@ -22,7 +21,6 @@ use super::super::{read_keypair_file, ClientConfig};
 pub fn create_amm_config_instr(
     config: &ClientConfig,
     config_index: u16,
-    tick_spacing: u16,
     trade_fee_rate: u32,
     protocol_fee_rate: u32,
     fund_fee_rate: u32,
@@ -45,7 +43,6 @@ pub fn create_amm_config_instr(
         })
         .args(raydium_instruction::CreateAmmConfig {
             index: config_index,
-            tick_spacing,
             trade_fee_rate,
             protocol_fee_rate,
             fund_fee_rate,
@@ -130,7 +127,6 @@ pub fn create_pool_instr(
     token_mint_1: Pubkey,
     token_program_0: Pubkey,
     token_program_1: Pubkey,
-    tick_array_bitmap: Pubkey,
     sqrt_price_x64: u128,
     open_time: u64,
 ) -> Result<Vec<Instruction>> {
@@ -182,7 +178,6 @@ pub fn create_pool_instr(
             token_vault_0,
             token_vault_1,
             observation_state: observation_key,
-            tick_array_bitmap,
             token_program_0,
             token_program_1,
             system_program: system_program::id(),
@@ -213,8 +208,6 @@ pub fn open_position_instr(
     amount_1_max: u64,
     tick_lower_index: i32,
     tick_upper_index: i32,
-    tick_array_lower_start_index: i32,
-    tick_array_upper_start_index: i32,
     with_metadata: bool,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
@@ -241,22 +234,7 @@ pub fn open_position_instr(
         ],
         &program.id(),
     );
-    let (tick_array_lower, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_lower_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_upper, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_upper_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
+
     let (personal_position_key, __bump) = Pubkey::find_program_address(
         &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
         &program.id(),
@@ -271,8 +249,6 @@ pub fn open_position_instr(
             metadata_account: metadata_account_key,
             pool_state: pool_account_key,
             protocol_position: protocol_position_key,
-            tick_array_lower,
-            tick_array_upper,
             personal_position: personal_position_key,
             token_account_0: user_token_account_0,
             token_account_1: user_token_account_1,
@@ -291,10 +267,6 @@ pub fn open_position_instr(
             liquidity,
             amount_0_max,
             amount_1_max,
-            tick_lower_index,
-            tick_upper_index,
-            tick_array_lower_start_index,
-            tick_array_upper_start_index,
             with_metadata,
             base_flag: None,
         })
@@ -317,10 +289,6 @@ pub fn open_position_with_token22_nft_instr(
     liquidity: u128,
     amount_0_max: u64,
     amount_1_max: u64,
-    tick_lower_index: i32,
-    tick_upper_index: i32,
-    tick_array_lower_start_index: i32,
-    tick_array_upper_start_index: i32,
     with_metadata: bool,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
@@ -338,24 +306,6 @@ pub fn open_position_with_token22_nft_instr(
         &[
             POSITION_SEED.as_bytes(),
             pool_account_key.to_bytes().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_lower, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_lower_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_upper, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_upper_start_index.to_be_bytes(),
         ],
         &program.id(),
     );
@@ -372,8 +322,6 @@ pub fn open_position_with_token22_nft_instr(
             position_nft_account: nft_ata_token_account,
             pool_state: pool_account_key,
             protocol_position: protocol_position_key,
-            tick_array_lower,
-            tick_array_upper,
             personal_position: personal_position_key,
             token_account_0: user_token_account_0,
             token_account_1: user_token_account_1,
@@ -392,10 +340,6 @@ pub fn open_position_with_token22_nft_instr(
             liquidity,
             amount_0_max,
             amount_1_max,
-            tick_lower_index,
-            tick_upper_index,
-            tick_array_lower_start_index,
-            tick_array_upper_start_index,
             with_metadata,
             base_flag: None,
         })
@@ -418,38 +362,16 @@ pub fn increase_liquidity_instr(
     liquidity: u128,
     amount_0_max: u64,
     amount_1_max: u64,
-    tick_lower_index: i32,
-    tick_upper_index: i32,
-    tick_array_lower_start_index: i32,
-    tick_array_upper_start_index: i32,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
     // Client.
     let client = Client::new(url, Rc::new(payer));
     let program = client.program(config.raydium_v3_program)?;
-    let (tick_array_lower, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_lower_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_upper, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_upper_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
     let (protocol_position_key, __bump) = Pubkey::find_program_address(
         &[
             POSITION_SEED.as_bytes(),
             pool_account_key.to_bytes().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
         ],
         &program.id(),
     );
@@ -466,8 +388,6 @@ pub fn increase_liquidity_instr(
             pool_state: pool_account_key,
             protocol_position: protocol_position_key,
             personal_position: personal_position_key,
-            tick_array_lower,
-            tick_array_upper,
             token_account_0: user_token_account_0,
             token_account_1: user_token_account_1,
             token_vault_0,
@@ -503,10 +423,6 @@ pub fn decrease_liquidity_instr(
     liquidity: u128,
     amount_0_min: u64,
     amount_1_min: u64,
-    tick_lower_index: i32,
-    tick_upper_index: i32,
-    tick_array_lower_start_index: i32,
-    tick_array_upper_start_index: i32,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
@@ -521,24 +437,6 @@ pub fn decrease_liquidity_instr(
         &[
             POSITION_SEED.as_bytes(),
             pool_account_key.to_bytes().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_lower, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_lower_start_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-    let (tick_array_upper, __bump) = Pubkey::find_program_address(
-        &[
-            TICK_ARRAY_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_array_upper_start_index.to_be_bytes(),
         ],
         &program.id(),
     );
@@ -552,8 +450,6 @@ pub fn decrease_liquidity_instr(
             protocol_position: protocol_position_key,
             token_vault_0,
             token_vault_1,
-            tick_array_lower,
-            tick_array_upper,
             recipient_token_account_0: user_token_account_0,
             recipient_token_account_1: user_token_account_1,
             token_program: spl_token::id(),
@@ -611,7 +507,6 @@ pub fn swap_instr(
     observation_state: Pubkey,
     user_input_token: Pubkey,
     user_out_put_token: Pubkey,
-    tick_array: Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     amount: u64,
     other_amount_threshold: u64,
@@ -633,7 +528,6 @@ pub fn swap_instr(
             output_token_account: user_out_put_token,
             input_vault,
             output_vault,
-            tick_array,
             observation_state,
             token_program: spl_token::id(),
         })

@@ -37,8 +37,6 @@ pub struct DecreaseLiquidity<'info> {
         seeds = [
             POSITION_SEED.as_bytes(),
             pool_state.key().as_ref(),
-            &personal_position.tick_lower_index.to_be_bytes(),
-            &personal_position.tick_upper_index.to_be_bytes(),
         ],
         bump,
         constraint = protocol_position.pool_id == pool_state.key(),
@@ -58,14 +56,6 @@ pub struct DecreaseLiquidity<'info> {
         constraint = token_vault_1.key() == pool_state.load()?.token_vault_1
     )]
     pub token_vault_1: Box<Account<'info, TokenAccount>>,
-
-    /// Stores init state for the lower tick
-    #[account(mut, constraint = tick_array_lower.load()?.pool_id == pool_state.key())]
-    pub tick_array_lower: AccountLoader<'info, TickArrayState>,
-
-    /// Stores init state for the upper tick
-    #[account(mut, constraint = tick_array_upper.load()?.pool_id == pool_state.key())]
-    pub tick_array_upper: AccountLoader<'info, TickArrayState>,
 
     /// The destination token account for receive amount_0
     #[account(
@@ -106,8 +96,6 @@ pub fn decrease_liquidity_v1<'a, 'b, 'c: 'info, 'info>(
         &mut ctx.accounts.personal_position,
         &ctx.accounts.token_vault_0.to_account_info(),
         &ctx.accounts.token_vault_1.to_account_info(),
-        &ctx.accounts.tick_array_lower,
-        &ctx.accounts.tick_array_upper,
         &ctx.accounts.recipient_token_account_0.to_account_info(),
         &ctx.accounts.recipient_token_account_1.to_account_info(),
         &ctx.accounts.token_program,
@@ -128,8 +116,6 @@ pub fn decrease_liquidity<'a, 'b, 'c: 'info, 'info>(
     personal_position: &'b mut Box<Account<'info, PersonalPositionState>>,
     token_vault_0: &'b AccountInfo<'info>,
     token_vault_1: &'b AccountInfo<'info>,
-    tick_array_lower_loader: &'b AccountLoader<'info, TickArrayState>,
-    tick_array_upper_loader: &'b AccountLoader<'info, TickArrayState>,
     recipient_token_account_0: &'b AccountInfo<'info>,
     recipient_token_account_1: &'b AccountInfo<'info>,
     token_program: &'b Program<'info, Token>,
@@ -149,8 +135,6 @@ pub fn decrease_liquidity<'a, 'b, 'c: 'info, 'info>(
     assert!(liquidity <= personal_position.liquidity);
     let liquidity_before;
     let pool_sqrt_price_x64;
-    let pool_tick_current;
-    let mut tickarray_bitmap_extension = None;
 
     let remaining_collect_accounts = &mut Vec::new();
     {
@@ -163,28 +147,9 @@ pub fn decrease_liquidity<'a, 'b, 'c: 'info, 'info>(
         }
         liquidity_before = pool_state.liquidity;
         pool_sqrt_price_x64 = pool_state.sqrt_price_x64;
-        pool_tick_current = pool_state.tick_current;
-
-        let use_tickarray_bitmap_extension = pool_state.is_overflow_default_tickarray_bitmap(vec![
-            tick_array_lower_loader.load()?.start_tick_index,
-            tick_array_upper_loader.load()?.start_tick_index,
-        ]);
-
+        
         for account_info in remaining_accounts.into_iter() {
-            if account_info
-                .key()
-                .eq(&TickArrayBitmapExtension::key(pool_state.key()))
-            {
-                tickarray_bitmap_extension = Some(account_info);
-                continue;
-            }
             remaining_collect_accounts.push(account_info);
-        }
-        if use_tickarray_bitmap_extension {
-            require!(
-                tickarray_bitmap_extension.is_some(),
-                ErrorCode::MissingTickArrayBitmapExtensionAccount
-            );
         }
     }
 
@@ -193,9 +158,6 @@ pub fn decrease_liquidity<'a, 'b, 'c: 'info, 'info>(
             pool_state_loader,
             protocol_position,
             personal_position,
-            tick_array_lower_loader,
-            tick_array_upper_loader,
-            tickarray_bitmap_extension,
             liquidity,
         )?;
 
@@ -212,7 +174,6 @@ pub fn decrease_liquidity<'a, 'b, 'c: 'info, 'info>(
     emit!(LiquidityCalculateEvent {
         pool_liquidity: liquidity_before,
         pool_sqrt_price_x64: pool_sqrt_price_x64,
-        pool_tick: pool_tick_current,
         calc_amount_0: decrease_amount_0,
         calc_amount_1: decrease_amount_1,
         trade_fee_owed_0: latest_fees_owed_0,
@@ -303,9 +264,6 @@ pub fn decrease_liquidity_and_update_position<'a, 'b, 'c: 'info, 'info>(
     pool_state_loader: &AccountLoader<'info, PoolState>,
     protocol_position: &mut Box<Account<'info, ProtocolPositionState>>,
     personal_position: &mut Box<Account<'info, PersonalPositionState>>,
-    tick_array_lower: &AccountLoader<'info, TickArrayState>,
-    tick_array_upper: &AccountLoader<'info, TickArrayState>,
-    tick_array_bitmap_extension: Option<&'c AccountInfo<'info>>,
     liquidity: u128,
 ) -> Result<(u64, u64, u64, u64)> {
     let mut pool_state = pool_state_loader.load_mut()?;
@@ -314,10 +272,7 @@ pub fn decrease_liquidity_and_update_position<'a, 'b, 'c: 'info, 'info>(
     if pool_state.get_status_by_bit(PoolStatusBitIndex::DecreaseLiquidity) {
         (decrease_amount_0, decrease_amount_1) = burn_liquidity(
             &mut pool_state,
-            tick_array_lower,
-            tick_array_upper,
             protocol_position,
-            tick_array_bitmap_extension,
             liquidity,
         )?;
 
@@ -383,70 +338,21 @@ pub fn decrease_liquidity_and_update_position<'a, 'b, 'c: 'info, 'info>(
 
 pub fn burn_liquidity<'c: 'info, 'info>(
     pool_state: &mut RefMut<PoolState>,
-    tick_array_lower_loader: &AccountLoader<'info, TickArrayState>,
-    tick_array_upper_loader: &AccountLoader<'info, TickArrayState>,
     protocol_position: &mut ProtocolPositionState,
-    tickarray_bitmap_extension: Option<&'c AccountInfo<'info>>,
     liquidity: u128,
 ) -> Result<(u64, u64)> {
-    require_keys_eq!(tick_array_lower_loader.load()?.pool_id, pool_state.key());
-    require_keys_eq!(tick_array_upper_loader.load()?.pool_id, pool_state.key());
     let liquidity_before = pool_state.liquidity;
     // get tick_state
-    let mut tick_lower_state = *tick_array_lower_loader
-        .load_mut()?
-        .get_tick_state_mut(protocol_position.tick_lower_index, pool_state.tick_spacing)?;
-    let mut tick_upper_state = *tick_array_upper_loader
-        .load_mut()?
-        .get_tick_state_mut(protocol_position.tick_upper_index, pool_state.tick_spacing)?;
     let clock = Clock::get()?;
-    let (amount_0, amount_1, flip_tick_lower, flip_tick_upper) = modify_position(
+    let (amount_0, amount_1) = modify_position(
         -i128::try_from(liquidity).unwrap(),
         pool_state,
         protocol_position,
-        &mut tick_lower_state,
-        &mut tick_upper_state,
         clock.unix_timestamp as u64,
     )?;
 
-    // update tick_state
-    tick_array_lower_loader.load_mut()?.update_tick_state(
-        protocol_position.tick_lower_index,
-        pool_state.tick_spacing,
-        tick_lower_state,
-    )?;
-    tick_array_upper_loader.load_mut()?.update_tick_state(
-        protocol_position.tick_upper_index,
-        pool_state.tick_spacing,
-        tick_upper_state,
-    )?;
-
-    if flip_tick_lower {
-        let mut tick_array_lower = tick_array_lower_loader.load_mut()?;
-        tick_array_lower.update_initialized_tick_count(false)?;
-        if tick_array_lower.initialized_tick_count == 0 {
-            pool_state.flip_tick_array_bit(
-                tickarray_bitmap_extension,
-                tick_array_lower.start_tick_index,
-            )?;
-        }
-    }
-    if flip_tick_upper {
-        let mut tick_array_upper = tick_array_upper_loader.load_mut()?;
-        tick_array_upper.update_initialized_tick_count(false)?;
-        if tick_array_upper.initialized_tick_count == 0 {
-            pool_state.flip_tick_array_bit(
-                tickarray_bitmap_extension,
-                tick_array_upper.start_tick_index,
-            )?;
-        }
-    }
-
     emit!(LiquidityChangeEvent {
         pool_state: pool_state.key(),
-        tick: pool_state.tick_current,
-        tick_lower: protocol_position.tick_lower_index,
-        tick_upper: protocol_position.tick_upper_index,
         liquidity_before: liquidity_before,
         liquidity_after: pool_state.liquidity,
     });

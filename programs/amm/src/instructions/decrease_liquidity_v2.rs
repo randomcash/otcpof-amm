@@ -30,8 +30,6 @@ pub struct DecreaseLiquidityV2<'info> {
         seeds = [
             POSITION_SEED.as_bytes(),
             pool_state.key().as_ref(),
-            &personal_position.tick_lower_index.to_be_bytes(),
-            &personal_position.tick_upper_index.to_be_bytes(),
         ],
         bump,
         constraint = protocol_position.pool_id == pool_state.key(),
@@ -51,14 +49,6 @@ pub struct DecreaseLiquidityV2<'info> {
         constraint = token_vault_1.key() == pool_state.load()?.token_vault_1
     )]
     pub token_vault_1: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    /// Stores init state for the lower tick
-    #[account(mut, constraint = tick_array_lower.load()?.pool_id == pool_state.key())]
-    pub tick_array_lower: AccountLoader<'info, TickArrayState>,
-
-    /// Stores init state for the upper tick
-    #[account(mut, constraint = tick_array_upper.load()?.pool_id == pool_state.key())]
-    pub tick_array_upper: AccountLoader<'info, TickArrayState>,
 
     /// The destination token account for receive amount_0
     #[account(
@@ -120,8 +110,6 @@ pub fn decrease_liquidity_v2<'a, 'b, 'c: 'info, 'info>(
         &mut ctx.accounts.personal_position,
         &ctx.accounts.token_vault_0.to_account_info(),
         &ctx.accounts.token_vault_1.to_account_info(),
-        &ctx.accounts.tick_array_lower,
-        &ctx.accounts.tick_array_upper,
         &ctx.accounts.recipient_token_account_0.to_account_info(),
         &ctx.accounts.recipient_token_account_1.to_account_info(),
         &ctx.accounts.token_program,

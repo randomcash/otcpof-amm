@@ -1,6 +1,6 @@
 use crate::error::ErrorCode;
 use crate::states::*;
-use crate::{libraries::tick_math, util};
+use crate::util;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::clock;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
@@ -87,19 +87,6 @@ pub struct CreatePool<'info> {
     )]
     pub observation_state: AccountLoader<'info, ObservationState>,
 
-    /// Initialize an account to store if a tick array is initialized.
-    #[account(
-        init,
-        seeds = [
-            POOL_TICK_ARRAY_BITMAP_SEED.as_bytes(),
-            pool_state.key().as_ref(),
-        ],
-        bump,
-        payer = pool_creator,
-        space = TickArrayBitmapExtension::LEN
-    )]
-    pub tick_array_bitmap: AccountLoader<'info, TickArrayBitmapExtension>,
-
     /// Spl token program or token program 2022
     pub token_program_0: Interface<'info, TokenInterface>,
     /// Spl token program or token program 2022
@@ -149,7 +136,6 @@ pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u6
     let pool_id = ctx.accounts.pool_state.key();
     let mut pool_state = ctx.accounts.pool_state.load_init()?;
 
-    let tick = tick_math::get_tick_at_sqrt_price(sqrt_price_x64)?;
     #[cfg(feature = "enable-log")]
     msg!(
         "create pool, init_price: {}, init_tick:{}",
@@ -167,7 +153,6 @@ pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u6
         bump,
         sqrt_price_x64,
         0,
-        tick,
         ctx.accounts.pool_creator.key(),
         ctx.accounts.token_vault_0.key(),
         ctx.accounts.token_vault_1.key(),
@@ -177,18 +162,11 @@ pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u6
         ctx.accounts.observation_state.key(),
     )?;
 
-    ctx.accounts
-        .tick_array_bitmap
-        .load_init()?
-        .initialize(pool_id);
-
     emit!(PoolCreatedEvent {
         token_mint_0: ctx.accounts.token_mint_0.key(),
         token_mint_1: ctx.accounts.token_mint_1.key(),
-        tick_spacing: ctx.accounts.amm_config.tick_spacing,
         pool_state: ctx.accounts.pool_state.key(),
         sqrt_price_x64,
-        tick,
         token_vault_0: ctx.accounts.token_vault_0.key(),
         token_vault_1: ctx.accounts.token_vault_1.key(),
     });
