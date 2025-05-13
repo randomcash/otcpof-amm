@@ -1,4 +1,5 @@
 use crate::error::ErrorCode;
+use crate::libraries::QueueType;
 use crate::states::*;
 use anchor_lang::prelude::*;
 use std::ops::DerefMut;
@@ -35,6 +36,8 @@ pub fn create_amm_config(
     trade_fee_rate: u32,
     protocol_fee_rate: u32,
     fund_fee_rate: u32,
+    queue_type_0: u8,
+    queue_type_1: u8
 ) -> Result<()> {
     let amm_config = ctx.accounts.amm_config.deref_mut();
     amm_config.owner = ctx.accounts.owner.key();
@@ -44,15 +47,18 @@ pub fn create_amm_config(
     amm_config.protocol_fee_rate = protocol_fee_rate;
     amm_config.fund_fee_rate = fund_fee_rate;
     amm_config.fund_owner = ctx.accounts.owner.key();
+    amm_config.queue_type_0 = QueueType::from(queue_type_0);
+    amm_config.queue_type_1 = QueueType::from(queue_type_1);
 
     emit!(ConfigChangeEvent {
         index: amm_config.index,
         owner: ctx.accounts.owner.key(),
         protocol_fee_rate: amm_config.protocol_fee_rate,
         trade_fee_rate: amm_config.trade_fee_rate,
-        tick_spacing: amm_config.tick_spacing,
         fund_fee_rate: amm_config.fund_fee_rate,
         fund_owner: amm_config.fund_owner,
+        queue_type_0: amm_config.queue_type_0,
+        queue_type_1: amm_config.queue_type_1
     });
 
     Ok(())

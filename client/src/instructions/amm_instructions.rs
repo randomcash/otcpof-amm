@@ -24,6 +24,8 @@ pub fn create_amm_config_instr(
     trade_fee_rate: u32,
     protocol_fee_rate: u32,
     fund_fee_rate: u32,
+    queue_type_0: u8,
+    queue_type_1: u8
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.admin_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
@@ -46,6 +48,8 @@ pub fn create_amm_config_instr(
             trade_fee_rate,
             protocol_fee_rate,
             fund_fee_rate,
+            queue_type_0,
+            queue_type_1,
         })
         .instructions()?;
     Ok(instructions)

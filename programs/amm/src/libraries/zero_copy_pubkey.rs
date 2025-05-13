@@ -4,7 +4,7 @@ use bytemuck::Pod;
 use bytemuck::Zeroable;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, Pod, Zeroable, AnchorSerialize, AnchorDeserialize)]
+#[derive(Copy, Clone, Debug, Default, Pod, Zeroable, AnchorSerialize, AnchorDeserialize, PartialEq, PartialOrd)]
 pub struct ZCPubkey([u8; 32]);
 
 // SAFETY: ZCPubkey is a plain-old-data struct, aligned and sized safely.

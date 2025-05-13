@@ -309,6 +309,8 @@ pub enum CommandsName {
         trade_fee_rate: u32,
         protocol_fee_rate: u32,
         fund_fee_rate: u32,
+        queue_type_0: u8,
+        queue_type_1: u8
     },
     UpdateConfig {
         config_index: u16,
@@ -645,6 +647,8 @@ fn main() -> Result<()> {
             trade_fee_rate,
             protocol_fee_rate,
             fund_fee_rate,
+            queue_type_0,
+            queue_type_1
         } => {
             let create_instr = create_amm_config_instr(
                 &pool_config.clone(),
@@ -652,6 +656,8 @@ fn main() -> Result<()> {
                 trade_fee_rate,
                 protocol_fee_rate,
                 fund_fee_rate,
+                queue_type_0,
+                queue_type_1
             )?;
             // send
             let signers = vec![&payer, &admin];

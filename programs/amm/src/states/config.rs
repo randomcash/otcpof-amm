@@ -1,4 +1,4 @@
-use crate::error::ErrorCode;
+use crate::{error::ErrorCode, libraries::QueueType};
 use anchor_lang::prelude::*;
 
 pub const AMM_CONFIG_SEED: &str = "amm_config";
@@ -18,18 +18,22 @@ pub struct AmmConfig {
     pub protocol_fee_rate: u32,
     /// The trade fee, denominated in hundredths of a bip (10^-6)
     pub trade_fee_rate: u32,
-    /// The tick spacing
-    pub tick_spacing: u16,
     /// The fund fee, denominated in hundredths of a bip (10^-6)
     pub fund_fee_rate: u32,
     // padding space for upgrade
     pub padding_u32: u32,
     pub fund_owner: Pubkey,
+
+    /// Queue 0 configuration
+    pub queue_type_0: QueueType,
+    /// Queue 1 configuration
+    pub queue_type_1: QueueType,
+
     pub padding: [u64; 3],
 }
 
 impl AmmConfig {
-    pub const LEN: usize = 8 + 1 + 2 + 32 + 4 + 4 + 2 + 64;
+    pub const LEN: usize = std::mem::size_of::<Self>();
 
     pub fn is_authorized<'info>(
         &self,
@@ -52,7 +56,8 @@ pub struct ConfigChangeEvent {
     pub owner: Pubkey,
     pub protocol_fee_rate: u32,
     pub trade_fee_rate: u32,
-    pub tick_spacing: u16,
     pub fund_fee_rate: u32,
     pub fund_owner: Pubkey,
+    pub queue_type_0: QueueType,
+    pub queue_type_1: QueueType,
 }

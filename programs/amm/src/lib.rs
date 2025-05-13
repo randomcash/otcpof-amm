@@ -47,13 +47,16 @@ pub mod amm_v3 {
     /// * `trade_fee_rate` - Trade fee rate, can be changed.
     /// * `protocol_fee_rate` - The rate of protocol fee within trade fee.
     /// * `fund_fee_rate` - The rate of fund fee within trade fee.
-    ///
+    /// *  `queue_type_0` - Type for queue side 0 (Fifo = 0, Priority = 1, etc)
+    /// *  `queue_type_1` - Type for queue side 1 (Fifo = 0, Priority = 1, etc)
     pub fn create_amm_config(
         ctx: Context<CreateAmmConfig>,
         index: u16,
         trade_fee_rate: u32,
         protocol_fee_rate: u32,
         fund_fee_rate: u32,
+        queue_type_0: u8,
+        queue_type_1: u8
     ) -> Result<()> {
         assert!(trade_fee_rate < FEE_RATE_DENOMINATOR_VALUE);
         assert!(protocol_fee_rate <= FEE_RATE_DENOMINATOR_VALUE);
@@ -65,6 +68,8 @@ pub mod amm_v3 {
             trade_fee_rate,
             protocol_fee_rate,
             fund_fee_rate,
+            queue_type_0,
+            queue_type_1
         )
     }
 

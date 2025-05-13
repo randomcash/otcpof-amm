@@ -3,6 +3,22 @@ use crate::error::ErrorCode;
 
 pub const MAX_ORDER_LIMIT: usize = 128;
 
+#[repr(u8)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum QueueType {
+    #[default]
+    Fifo = 0,
+}
+
+impl From<u8> for QueueType {
+    fn from(value: u8) -> Self {
+        match value {
+            0 | _=> QueueType::Fifo,
+        }
+    }
+}
+
+//TODO {3}: might remove this, as it will probably go unused
 pub trait Queue<T> {
     fn push(&mut self, p: T) -> Result<()>;
     fn pop(&mut self) -> Option<T>;
@@ -62,7 +78,7 @@ impl<T> FifoQueue<T> where T: ZeroCopy {
     }
 }
 
-impl<T> Queue<T> for FifoQueue<T> where T: ZeroCopy {
+impl<T> Queue<T> for FifoQueue<T> where T: ZeroCopy + PartialOrd {
     fn push(&mut self, p: T) -> Result<()> {
         if self.len as usize == MAX_ORDER_LIMIT {
             return Err(error!(ErrorCode::QueueFull));

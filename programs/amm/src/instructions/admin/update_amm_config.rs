@@ -28,6 +28,10 @@ pub fn update_amm_config(ctx: Context<UpdateAmmConfig>, param: u8, value: u32) -
             let new_fund_owner = *ctx.remaining_accounts.iter().next().unwrap().key;
             set_new_fund_owner(amm_config, new_fund_owner);
         }
+        Some(5) => {
+            //TODO:
+            todo!("implement queue type change when different types of queues are implemented")
+        }
         _ => return err!(ErrorCode::InvalidUpdateConfigFlag),
     }
 
@@ -36,9 +40,10 @@ pub fn update_amm_config(ctx: Context<UpdateAmmConfig>, param: u8, value: u32) -
         owner: amm_config.owner,
         trade_fee_rate: amm_config.trade_fee_rate,
         protocol_fee_rate: amm_config.protocol_fee_rate,
-        tick_spacing: amm_config.tick_spacing,
         fund_fee_rate: amm_config.fund_fee_rate,
         fund_owner: amm_config.fund_owner,
+        queue_type_0: amm_config.queue_type_0,
+        queue_type_1: amm_config.queue_type_1
     });
 
     Ok(())
