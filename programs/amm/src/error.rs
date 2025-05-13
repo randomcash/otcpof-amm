@@ -16,21 +16,6 @@ pub enum ErrorCode {
     #[msg("Minting amount should be greater than 0")]
     ZeroMintAmount,
 
-    #[msg("Tick out of range")]
-    InvaildTickIndex,
-    #[msg("The lower tick must be below the upper tick")]
-    TickInvaildOrder,
-    #[msg("The tick must be greater, or equal to the minimum tick(-443636)")]
-    TickLowerOverflow,
-    #[msg("The tick must be lesser than, or equal to the maximum tick(443636)")]
-    TickUpperOverflow,
-    #[msg("tick % tick_spacing must be zero")]
-    TickAndSpacingNotMatch,
-    #[msg("Invaild tick array account")]
-    InvalidTickArray,
-    #[msg("Invaild tick array boundary")]
-    InvalidTickArrayBoundary,
-
     #[msg("Square root price limit overflow")]
     SqrtPriceLimitOverflow,
     // second inequality must be < because the price can never reach the price at the max tick
@@ -105,4 +90,7 @@ pub enum ErrorCode {
     MaxTokenOverflow,
     #[msg("calculate overflow")]
     CalculateOverflow,
+
+    #[msg("Queue is full")]
+    QueueFull
 }

@@ -70,6 +70,10 @@ pub struct PoolState {
     pub token_vault_0: Pubkey,
     pub token_vault_1: Pubkey,
 
+    // Token pair queue
+    pub token_queue_0: Pubkey,
+    pub token_queue_1: Pubkey,
+
     /// observation account key
     pub observation_key: Pubkey,
 
@@ -134,29 +138,8 @@ pub struct PoolState {
 }
 
 impl PoolState {
-    pub const LEN: usize = 8
-        + 1
-        + 32 * 7
-        + 1
-        + 1
-        + 2
-        + 16
-        + 16
-        + 4
-        + 2
-        + 2
-        + 16
-        + 16
-        + 8
-        + 8
-        + 16
-        + 16
-        + 16
-        + 16
-        + 8
-        + RewardInfo::LEN * REWARD_NUM
-        + 8 * 16
-        + 512;
+    // Zero copy: DISCRIMINATOR + Size
+    pub const LEN: usize = Self::DISCRIMINATOR.len() + std::mem::size_of::<Self>();
 
     pub fn seeds(&self) -> [&[u8]; 5] {
         [
@@ -481,7 +464,7 @@ pub struct RewardInfo {
 }
 
 impl RewardInfo {
-    pub const LEN: usize = 1 + 8 + 8 + 8 + 16 + 8 + 8 + 32 + 32 + 32 + 16;
+    pub const LEN: usize = std::mem::size_of::<Self>();
 
     /// Creates a new RewardInfo
     pub fn new(authority: Pubkey) -> Self {
@@ -764,6 +747,8 @@ pub mod pool_test {
             let token_mint_1 = Pubkey::new_unique();
             let token_vault_0 = Pubkey::new_unique();
             let token_vault_1 = Pubkey::new_unique();
+            let token_queue_0 = Pubkey::new_unique();
+            let token_queue_1 = Pubkey::new_unique();
             let observation_key = Pubkey::new_unique();
             let mint_decimals_0: u8 = 0x13;
             let mint_decimals_1: u8 = 0x14;
@@ -876,6 +861,10 @@ pub mod pool_test {
             offset += 32;
             pool_data[offset..offset + 32].copy_from_slice(&token_vault_1.to_bytes());
             offset += 32;
+            pool_data[offset..offset + 32].copy_from_slice(&token_queue_0.to_bytes());
+            offset += 32;
+            pool_data[offset..offset + 32].copy_from_slice(&token_queue_1.to_bytes());
+            offset += 32;
             pool_data[offset..offset + 32].copy_from_slice(&observation_key.to_bytes());
             offset += 32;
             pool_data[offset..offset + 1].copy_from_slice(&mint_decimals_0.to_le_bytes());
@@ -959,6 +948,10 @@ pub mod pool_test {
             assert_eq!(unpack_token_vault_0, token_vault_0);
             let unpack_token_vault_1 = unpack_data.token_vault_1;
             assert_eq!(unpack_token_vault_1, token_vault_1);
+            let unpack_token_vault_0 = unpack_data.token_queue_0;
+            assert_eq!(unpack_token_vault_0, token_queue_0);
+            let unpack_token_vault_1 = unpack_data.token_queue_1;
+            assert_eq!(unpack_token_vault_1, token_queue_1);
             let unpack_observation_key = unpack_data.observation_key;
             assert_eq!(unpack_observation_key, observation_key);
             let unpack_mint_decimals_0 = unpack_data.mint_decimals_0;

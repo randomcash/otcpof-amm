@@ -4,7 +4,8 @@ pub mod full_math;
 pub mod liquidity_math;
 pub mod sqrt_price_math;
 pub mod swap_math;
-
+pub mod queues;
+pub mod zero_copy_pubkey;
 pub mod unsafe_math;
 
 pub use big_num::*;
@@ -15,3 +16,5 @@ pub use sqrt_price_math::*;
 pub use swap_math::*;
 
 pub use unsafe_math::*;
+pub use queues::*;
+pub use zero_copy_pubkey::*;
