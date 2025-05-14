@@ -26,7 +26,7 @@ pub fn create_amm_config_instr(
     fund_fee_rate: u32,
     queue_type_0: u8,
     queue_type_1: u8
-) -> Result<Vec<Instruction>> {
+) -> Result<(Vec<Instruction>, Pubkey)> {
     let payer = read_keypair_file(&config.admin_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
     // Client.
@@ -52,7 +52,7 @@ pub fn create_amm_config_instr(
             queue_type_1,
         })
         .instructions()?;
-    Ok(instructions)
+    Ok((instructions, amm_config_key))
 }
 
 pub fn update_amm_config_instr(
@@ -133,7 +133,7 @@ pub fn create_pool_instr(
     token_program_1: Pubkey,
     sqrt_price_x64: u128,
     open_time: u64,
-) -> Result<Vec<Instruction>> {
+) -> Result<(Vec<Instruction>, Pubkey)> {
     let payer = read_keypair_file(&config.payer_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
     // Client.
@@ -192,7 +192,7 @@ pub fn create_pool_instr(
             open_time,
         })
         .instructions()?;
-    Ok(instructions)
+    Ok((instructions, pool_account_key))
 }
 
 pub fn open_position_instr(

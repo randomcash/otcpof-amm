@@ -275,16 +275,17 @@ pub enum CommandsName {
         #[arg(short, long)]
         token_2022: bool,
         #[arg(short, long)]
-        enable_freeze: bool,
+        freezable: bool,
         #[arg(short, long)]
-        enable_close: bool,
+        closable: bool,
         #[arg(short, long)]
-        enable_non_transferable: bool,
+        non_transferable: bool,
         #[arg(short, long)]
-        enable_permanent_delegate: bool,
+        permanent_delegate: bool,
         rate_bps: Option<i16>,
         default_account_state: Option<String>,
         transfer_fee: Option<Vec<u64>>,
+        #[arg(last(true))]
         confidential_transfer_auto_approve: Option<bool>,
     },
     NewToken {
@@ -352,8 +353,6 @@ pub enum CommandsName {
         authority: Option<Pubkey>,
     },
     OpenPosition {
-        #[arg(short, long)]
-        is_base_0: bool,
         amount_0: u64,
         amount_1: u64,
         #[arg(short, long)]
@@ -456,10 +455,10 @@ fn main() -> Result<()> {
             authority,
             decimals,
             token_2022,
-            enable_freeze,
-            enable_close,
-            enable_non_transferable,
-            enable_permanent_delegate,
+            freezable: enable_freeze,
+            closable: enable_close,
+            non_transferable: enable_non_transferable,
+            permanent_delegate: enable_permanent_delegate,
             rate_bps,
             default_account_state,
             transfer_fee,
@@ -550,7 +549,9 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+
+            println!("mint: {}", mint.pubkey());
+            println!("signature: {}", signature);
         }
         CommandsName::NewToken {
             mint,
@@ -585,7 +586,8 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("token: {:?}", auxiliary_token_keypair.pubkey());
+            println!("signature: {}", signature);
         }
         CommandsName::MintTo {
             mint,
@@ -611,7 +613,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::WrapSol { amount } => {
             let wrap_sol_instr = wrap_sol_instr(&pool_config, amount)?;
@@ -625,7 +627,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::UnWrapSol { wrap_sol_account } => {
             let unwrap_sol_instr =
@@ -640,7 +642,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::CreateConfig {
             config_index,
@@ -650,7 +652,7 @@ fn main() -> Result<()> {
             queue_type_0,
             queue_type_1
         } => {
-            let create_instr = create_amm_config_instr(
+            let (create_instr, amm_config_key) = create_amm_config_instr(
                 &pool_config.clone(),
                 config_index,
                 trade_fee_rate,
@@ -669,7 +671,8 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("amm_config_key: {}", amm_config_key);
+            println!("signature: {}", signature);
         }
         CommandsName::UpdateConfig {
             config_index,
@@ -691,6 +694,9 @@ fn main() -> Result<()> {
                 Some(4) => {
                     let remaining_key = remaining.unwrap();
                     remaing_accounts.push(AccountMeta::new_readonly(remaining_key, false));
+                }
+                Some(5) => {
+                    todo!("updating queue type not supported yet");
                 }
                 _ => panic!("error input"),
             }
@@ -718,7 +724,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::CreateOperation => {
             let create_instr = create_operation_account_instr(&pool_config.clone())?;
@@ -732,7 +738,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::UpdateOperation { param, keys } => {
             let create_instr = update_operation_account_instr(&pool_config.clone(), param, keys)?;
@@ -746,7 +752,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::CreatePool {
             config_index,
@@ -780,7 +786,7 @@ fn main() -> Result<()> {
                 ],
                 &pool_config.raydium_v3_program,
             );
-            let create_pool_instr = create_pool_instr(
+            let (create_pool_instr, pool_account_address) = create_pool_instr(
                 &pool_config.clone(),
                 amm_config_key,
                 mint0,
@@ -801,7 +807,8 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("pool_account_address: {}", pool_account_address);
+            println!("signature: {}", signature);
         }
         CommandsName::InitReward {
             open_time,
@@ -854,7 +861,8 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("reward_token_vault: {}", reward_token_vault);
+            println!("signature: {}", signature);
         }
         CommandsName::SetRewardParams {
             index,
@@ -907,7 +915,7 @@ fn main() -> Result<()> {
                 recent_hash,
             );
             let signature = send_txn(&rpc_client, &txn, true)?;
-            println!("{}", signature);
+            println!("signature: {}", signature);
         }
         CommandsName::TransferRewardOwner {
             pool_id,
@@ -938,11 +946,10 @@ fn main() -> Result<()> {
                     recent_hash,
                 );
                 let signature = send_txn(&rpc_client, &txn, true)?;
-                println!("{}", signature);
+                println!("signature: {}", signature);
             }
         }
         CommandsName::OpenPosition {
-            is_base_0,
             amount_0,
             amount_1,
             with_metadata,

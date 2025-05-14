@@ -33,7 +33,7 @@ pub struct AmmConfig {
 }
 
 impl AmmConfig {
-    pub const LEN: usize = std::mem::size_of::<Self>();
+    pub const LEN: usize = Self::DISCRIMINATOR.len() + std::mem::size_of::<Self>();
 
     pub fn is_authorized<'info>(
         &self,

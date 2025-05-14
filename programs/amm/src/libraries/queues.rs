@@ -50,6 +50,8 @@ impl<T> Default for FifoQueue<T> where T: ZeroCopy {
 }
 
 impl<T> FifoQueue<T> where T: ZeroCopy {
+    pub const LEN: usize = Self::DISCRIMINATOR.len() + std::mem::size_of::<Self>();
+    
     pub fn new() -> Self {
         Self {
             buffer: [Default::default(); MAX_ORDER_LIMIT],

@@ -16,7 +16,7 @@ pub struct CreateAmmConfig<'info> {
 
     /// Initialize config state account to store protocol owner address and fee rates.
     #[account(
-        init,
+        init_if_needed,
         seeds = [
             AMM_CONFIG_SEED.as_bytes(),
             &index.to_be_bytes()
