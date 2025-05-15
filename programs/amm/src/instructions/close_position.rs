@@ -47,30 +47,6 @@ pub struct ClosePosition<'info> {
 pub fn close_position<'a, 'b, 'c, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, ClosePosition<'info>>,
 ) -> Result<()> {
-    if ctx.accounts.personal_position.liquidity != 0
-        || ctx.accounts.personal_position.token_fees_owed_0 != 0
-        || ctx.accounts.personal_position.token_fees_owed_1 != 0
-    {
-        msg!(
-            "remaing liquidity:{},token_fees_owed_0:{},token_fees_owed_1:{}",
-            ctx.accounts.personal_position.liquidity,
-            ctx.accounts.personal_position.token_fees_owed_0,
-            ctx.accounts.personal_position.token_fees_owed_1
-        );
-        return err!(ErrorCode::ClosePositionErr);
-    }
-
-    for i in 0..ctx.accounts.personal_position.reward_infos.len() {
-        if ctx.accounts.personal_position.reward_infos[i].reward_amount_owed != 0 {
-            msg!(
-                "remaing reward index:{},amount:{}",
-                i,
-                ctx.accounts.personal_position.reward_infos[i].reward_amount_owed,
-            );
-            return err!(ErrorCode::ClosePositionErr);
-        }
-    }
-
     let token_program = ctx.accounts.token_program.to_account_info();
     let position_nft_mint = ctx.accounts.position_nft_mint.to_account_info();
     let personal_nft_account = ctx.accounts.position_nft_account.to_account_info();

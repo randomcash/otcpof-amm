@@ -341,7 +341,7 @@ fn swap_compute(
         amount_specified_remaining: amount_specified,
         amount_calculated: 0,
         sqrt_price_x64: pool_state.sqrt_price_x64,
-        liquidity: pool_state.liquidity,
+        liquidity: 0,
     };
 
     let mut loop_count = 0;

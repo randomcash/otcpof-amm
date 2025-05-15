@@ -25,11 +25,17 @@ use std::convert::identity;
 use std::ops::DerefMut;
 
 #[derive(Accounts)]
-#[instruction(tick_lower_index: i32, tick_upper_index: i32,tick_array_lower_start_index:i32,tick_array_upper_start_index:i32)]
 pub struct OpenPosition<'info> {
     /// Pays to mint the position
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    /// Which config the pool belongs to.
+    #[account(
+        mut,
+        constraint = amm_config.key() == pool_state.load()?.amm_config
+    )]
+    pub amm_config: Box<Account<'info, AmmConfig>>,
 
     /// CHECK: Receives the position NFT
     pub position_nft_owner: UncheckedAccount<'info>,
@@ -68,8 +74,6 @@ pub struct OpenPosition<'info> {
         seeds = [
             POSITION_SEED.as_bytes(),
             pool_state.key().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
         ],
         bump,
         payer = payer,
@@ -125,7 +129,6 @@ pub struct OpenPosition<'info> {
     pub token_program: Program<'info, Token>,
     /// Program to create an ATA for receiving position NFT
     pub associated_token_program: Program<'info, AssociatedToken>,
-
     // /// Program to create NFT metadata
     // /// CHECK: Metadata program address constraint applied
     //pub metadata_program: Program<'info, Metadata>,
@@ -138,47 +141,6 @@ pub struct OpenPosition<'info> {
     //     bump
     // )]
     // pub tick_array_bitmap: AccountLoader<'info, TickArrayBitmapExtension>,
-}
-
-pub fn open_position_v1<'a, 'b, 'c: 'info, 'info>(
-    ctx: Context<'a, 'b, 'c, 'info, OpenPosition<'info>>,
-    liquidity: u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
-    with_metadata: bool,
-    base_flag: Option<bool>,
-) -> Result<()> {
-    open_position(
-        &ctx.accounts.payer,
-        &ctx.accounts.position_nft_owner,
-        &ctx.accounts.position_nft_mint.to_account_info(),
-        &ctx.accounts.position_nft_account.to_account_info(),
-        Some(&ctx.accounts.metadata_account),
-        &ctx.accounts.pool_state,
-        &mut ctx.accounts.protocol_position,
-        &mut ctx.accounts.personal_position,
-        &ctx.accounts.token_account_0.to_account_info(),
-        &ctx.accounts.token_account_1.to_account_info(),
-        &ctx.accounts.token_vault_0.to_account_info(),
-        &ctx.accounts.token_vault_1.to_account_info(),
-        &ctx.accounts.rent,
-        &ctx.accounts.system_program,
-        &ctx.accounts.token_program,
-        &ctx.accounts.associated_token_program,
-        //Some(&ctx.accounts.metadata_program),
-        None,
-        None,
-        None,
-        &ctx.remaining_accounts,
-        ctx.bumps.protocol_position,
-        ctx.bumps.personal_position,
-        liquidity,
-        amount_0_max,
-        amount_1_max,
-        with_metadata,
-        base_flag,
-        false,
-    )
 }
 
 pub fn open_position<'a, 'b, 'c: 'info, 'info>(
@@ -205,70 +167,53 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     remaining_accounts: &'c [AccountInfo<'info>],
     protocol_position_bump: u8,
     personal_position_bump: u8,
-    liquidity: u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
+    amount_0: u64,
+    amount_1: u64,
     with_metadata: bool,
-    base_flag: Option<bool>,
     use_metadata_extension: bool,
 ) -> Result<()> {
-    let mut liquidity = liquidity;
-    {
-        let pool_state = &mut pool_state_loader.load_mut()?;
-        if !pool_state.get_status_by_bit(PoolStatusBitIndex::OpenPositionOrIncreaseLiquidity) {
-            return err!(ErrorCode::NotApproved);
-        }
-        
-        // check if protocol position is initialized
-        let protocol_position = protocol_position.deref_mut();
-        if protocol_position.pool_id == Pubkey::default() {
-            protocol_position.bump = protocol_position_bump;
-            protocol_position.pool_id = pool_state_loader.key();
-        }
-
-        let (amount_0, amount_1, amount_0_transfer_fee, amount_1_transfer_fee) = add_liquidity(
-            payer,
-            token_account_0,
-            token_account_1,
-            token_vault_0,
-            token_vault_1,
-            protocol_position,
-            token_program_2022,
-            token_program,
-            vault_0_mint,
-            vault_1_mint,
-            pool_state,
-            &mut liquidity,
-            amount_0_max,
-            amount_1_max,
-            base_flag,
-        )?;
-
-        // let personal_position = &mut personal_position;
-        personal_position.bump = [personal_position_bump];
-        personal_position.nft_mint = position_nft_mint.key();
-        personal_position.pool_id = pool_state_loader.key();
-
-        personal_position.fee_growth_inside_0_last_x64 =
-            protocol_position.fee_growth_inside_0_last_x64;
-        personal_position.fee_growth_inside_1_last_x64 =
-            protocol_position.fee_growth_inside_1_last_x64;
-
-        // update rewards, must update before update liquidity
-        personal_position.update_rewards(protocol_position.reward_growth_inside, false)?;
-        personal_position.liquidity = liquidity;
-
-        emit!(CreatePersonalPositionEvent {
-            pool_state: pool_state_loader.key(),
-            minter: payer.key(),
-            nft_owner: position_nft_owner.key(),
-            liquidity: liquidity,
-            deposit_amount_0: amount_0,
-            deposit_amount_1: amount_1,
-            deposit_amount_0_transfer_fee: amount_0_transfer_fee,
-            deposit_amount_1_transfer_fee: amount_1_transfer_fee
-        });
+    let pool_state = &mut pool_state_loader.load_mut()?;
+    if !pool_state.get_status_by_bit(PoolStatusBitIndex::OpenPositionOrIncreaseLiquidity) {
+        return err!(ErrorCode::NotApproved);
     }
+
+    // check if protocol position is initialized
+    let protocol_position = protocol_position.deref_mut();
+    if protocol_position.pool_id == Pubkey::default() {
+        protocol_position.bump = protocol_position_bump;
+        protocol_position.pool_id = pool_state_loader.key();
+    }
+
+    let (amount_0, amount_1, amount_0_transfer_fee, amount_1_transfer_fee) = add_liquidity(
+        payer,
+        token_account_0,
+        token_account_1,
+        token_vault_0,
+        token_vault_1,
+        protocol_position,
+        token_program_2022,
+        token_program,
+        vault_0_mint,
+        vault_1_mint,
+        pool_state,
+        amount_0,
+        amount_1,
+    )?;
+
+    // let personal_position = &mut personal_position;
+    personal_position.bump = [personal_position_bump];
+    personal_position.nft_mint = position_nft_mint.key();
+    personal_position.pool_id = pool_state_loader.key();
+
+    emit!(CreatePersonalPositionEvent {
+        pool_state: pool_state_loader.key(),
+        minter: payer.key(),
+        nft_owner: position_nft_owner.key(),
+        deposit_amount_0: amount_0,
+        deposit_amount_1: amount_1,
+        deposit_amount_0_transfer_fee: amount_0_transfer_fee,
+        deposit_amount_1_transfer_fee: amount_1_transfer_fee
+    });
 
     mint_nft_and_remove_mint_authority(
         payer,
@@ -300,67 +245,9 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
     vault_0_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
     vault_1_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
     pool_state: &mut RefMut<PoolState>,
-    liquidity: &mut u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
-    base_flag: Option<bool>,
+    amount_0: u64,
+    amount_1: u64,
 ) -> Result<(u64, u64, u64, u64)> {
-    if *liquidity == 0 {
-        if base_flag.is_none() {
-            // when establishing a new position , liquidity allows for further additions
-            return Ok((0, 0, 0, 0));
-        }
-        if base_flag.unwrap() {
-            // must deduct transfer fee before calculate liquidity
-            // because only v2 instruction support token_2022, vault_0_mint must be exist
-            let amount_0_transfer_fee =
-                get_transfer_fee(vault_0_mint.clone().unwrap(), amount_0_max).unwrap();
-            // TODO: add liquidity calculation
-            /* *liquidity = liquidity_math::get_liquidity_from_single_amount_0(
-                pool_state.sqrt_price_x64,
-                tick_math::get_sqrt_price_at_tick(tick_lower_index)?,
-                tick_math::get_sqrt_price_at_tick(tick_upper_index)?,
-                amount_0_max.checked_sub(amount_0_transfer_fee).unwrap(),
-            ); */
-            #[cfg(feature = "enable-log")]
-            msg!(
-                "liquidity: {}, amount_0_max:{}, amount_0_transfer_fee:{}",
-                *liquidity,
-                amount_0_max,
-                amount_0_transfer_fee
-            );
-        } else {
-            // must deduct transfer fee before calculate liquidity
-            // because only v2 instruction support token_2022, vault_1_mint must be exist
-            let amount_1_transfer_fee =
-                get_transfer_fee(vault_1_mint.clone().unwrap(), amount_1_max).unwrap();
-            // TODO: add liquidity calculation
-            /* *liquidity = liquidity_math::get_liquidity_from_single_amount_1(
-                pool_state.sqrt_price_x64,
-                tick_math::get_sqrt_price_at_tick(tick_lower_index)?,
-                tick_math::get_sqrt_price_at_tick(tick_upper_index)?,
-                amount_1_max.checked_sub(amount_1_transfer_fee).unwrap(),
-            ); */
-            #[cfg(feature = "enable-log")]
-            msg!(
-                "liquidity: {}, amount_1_max:{}, amount_1_transfer_fee:{}",
-                *liquidity,
-                amount_1_max,
-                amount_1_transfer_fee
-            );
-        }
-    }
-    assert!(*liquidity > 0);
-    let liquidity_before = pool_state.liquidity;
-
-    let clock = Clock::get()?;
-    let (amount_0, amount_1) = modify_position(
-        i128::try_from(*liquidity).unwrap(),
-        pool_state,
-        protocol_position,
-        clock.unix_timestamp as u64,
-    )?;
-
     require!(
         amount_0 > 0 || amount_1 > 0,
         ErrorCode::ForbidBothZeroForSupplyLiquidity
@@ -376,16 +263,15 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
         amount_1_transfer_fee =
             get_transfer_inverse_fee(vault_1_mint.clone().unwrap(), amount_1).unwrap();
     }
-    emit!(LiquidityCalculateEvent {
+
+    /*emit!(LiquidityCalculateEvent {
         pool_liquidity: liquidity_before,
         pool_sqrt_price_x64: pool_state.sqrt_price_x64,
         calc_amount_0: amount_0,
         calc_amount_1: amount_1,
-        trade_fee_owed_0: 0,
-        trade_fee_owed_1: 0,
         transfer_fee_0: amount_0_transfer_fee,
         transfer_fee_1: amount_1_transfer_fee,
-    });
+    });*/
     #[cfg(feature = "enable-log")]
     msg!(
         "amount_0: {}, amount_0_transfer_fee: {}, amount_1: {}, amount_1_transfer_fee: {}",
@@ -395,12 +281,12 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
         amount_1_transfer_fee
     );
     require_gte!(
-        amount_0_max,
+        amount_0,
         amount_0 + amount_0_transfer_fee,
         ErrorCode::PriceSlippageCheck
     );
     require_gte!(
-        amount_1_max,
+        amount_1,
         amount_1 + amount_1_transfer_fee,
         ErrorCode::PriceSlippageCheck
     );
@@ -427,80 +313,18 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
         token_2022_program_opt.clone(),
         amount_1 + amount_1_transfer_fee,
     )?;
-    emit!(LiquidityChangeEvent {
+
+    /*emit!(LiquidityChangeEvent {
         pool_state: pool_state.key(),
         liquidity_before: liquidity_before,
         liquidity_after: pool_state.liquidity,
-    });
+    });*/
     Ok((
         amount_0,
         amount_1,
         amount_0_transfer_fee,
         amount_1_transfer_fee,
     ))
-}
-
-//TODO: update position modifying
-pub fn modify_position(
-    liquidity_delta: i128,
-    pool_state: &mut RefMut<PoolState>,
-    protocol_position_state: &mut ProtocolPositionState,
-    timestamp: u64,
-) -> Result<(u64, u64)> {
-    /* let (flip_tick_lower, flip_tick_upper) = update_position(
-        liquidity_delta,
-        pool_state,
-        protocol_position_state,
-        timestamp,
-    )?;
-    */
-
-    let mut amount_0 = 0;
-    let mut amount_1 = 0;
-
-    /* 
-    if liquidity_delta != 0 {
-        (amount_0, amount_1) = liquidity_math::get_delta_amounts_signed(
-            pool_state.tick_current,
-            pool_state.sqrt_price_x64,
-            liquidity_delta,
-        )?;
-        if pool_state.tick_current >= tick_lower_state.tick
-            && pool_state.tick_current < tick_upper_state.tick
-        {
-            pool_state.liquidity =
-                liquidity_math::add_delta(pool_state.liquidity, liquidity_delta)?;
-        }
-    }
-    */
-
-    Ok((amount_0, amount_1))
-}
-
-/// Updates a position with the given liquidity delta and tick
-pub fn update_position(
-    liquidity_delta: i128,  
-    pool_state: &mut RefMut<PoolState>,
-    protocol_position_state: &mut ProtocolPositionState,
-    timestamp: u64,
-) -> Result<(bool, bool)> {
-    let updated_reward_infos = pool_state.update_reward_infos(timestamp)?;
-
-    let mut flipped_lower = false;
-    let mut flipped_upper = false;
-
-    // update the ticks if liquidity delta is non-zero
-    if liquidity_delta != 0 {
-        // Update tick state and find if tick is flipped
-        #[cfg(feature = "enable-log")]
-        msg!(
-            "tick_upper.reward_growths_outside_x64:{:?}, tick_lower.reward_growths_outside_x64:{:?}",
-            identity(tick_upper_state.reward_growths_outside_x64),
-            identity(tick_lower_state.reward_growths_outside_x64)
-        );
-    }
-
-    Ok((flipped_lower, flipped_upper))
 }
 
 fn mint_nft_and_remove_mint_authority<'info>(
@@ -588,6 +412,8 @@ fn mint_nft_and_remove_mint_authority<'info>(
     )
 }
 
+//TODO: update this with protocol metadata
+//TODO: move this to another proper file with protocol metadata
 fn get_metadata_data(personal_position_id: Pubkey) -> (String, String, String) {
     return (
         String::from("Raydium Concentrated Liquidity"),
@@ -722,66 +548,4 @@ pub fn initialize_token_metadata_extension<'info>(
     )?;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod modify_position_test {
-    use super::modify_position;
-    use crate::error::ErrorCode;
-    use crate::states::oracle::block_timestamp_mock;
-    use crate::states::pool_test::build_pool;
-    use crate::states::protocol_position::*;
-
-    #[test]
-    fn liquidity_delta_zero_empty_liquidity_not_allowed_test() {
-        let pool_state_ref = build_pool( 1000, 10000);
-        let pool_state = &mut pool_state_ref.borrow_mut();
-
-        let result = modify_position(
-            0,
-            pool_state,
-            &mut ProtocolPositionState::default(),
-            block_timestamp_mock(),
-        );
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), ErrorCode::InvaildLiquidity.into());
-    }
-
-    #[test]
-    fn init_position_in_range_test() {
-        let liquidity = 10000;
-        let tick_current = 1;
-        let pool_state_ref = build_pool(
-            tick_current, //tick_math::get_sqrt_price_at_tick(tick_current).unwrap(), TODO: calculate this
-            liquidity,
-        );
-        let pool_state = &mut pool_state_ref.borrow_mut();
-
-        let liquidity_delta = 10000;
-        let protocol_position = &mut ProtocolPositionState::default();
-        let (amount_0_int, amount_1_int) = modify_position(
-            liquidity_delta,
-            pool_state,
-            protocol_position,
-            block_timestamp_mock(),
-        )
-        .unwrap();
-        assert!(amount_0_int != 0);
-        assert!(amount_1_int != 0);
-
-        // check pool active liquidity
-        let new_liquidity = pool_state.liquidity;
-        assert_eq!(new_liquidity, liquidity + (liquidity_delta as u128));
-
-        // check tick state
-        // check protocol position
-        let fee_growth_inside_0_last_x64 = pool_state.fee_growth_global_0_x64;
-        let fee_growth_inside_1_last_x64 = pool_state.fee_growth_global_1_x64;
-        assert!(protocol_position.fee_growth_inside_0_last_x64 == fee_growth_inside_0_last_x64);
-        assert!(protocol_position.fee_growth_inside_1_last_x64 == fee_growth_inside_1_last_x64);
-        assert!(protocol_position.token_fees_owed_0 == 0);
-        assert!(protocol_position.token_fees_owed_1 == 0);
-
-        // check protocol position state
-    }
 }

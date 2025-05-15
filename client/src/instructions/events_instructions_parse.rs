@@ -5,7 +5,6 @@ use anyhow::Result;
 use colorful::Color;
 use colorful::Colorful;
 use raydium_amm_v3::instruction;
-use raydium_amm_v3::instructions::*;
 use raydium_amm_v3::states::*;
 use regex::Regex;
 use solana_sdk::bs58;
@@ -147,12 +146,6 @@ pub fn handle_program_log(
                 println!(
                     "{:#?}",
                     decode_event::<CollectPersonalFeeEvent>(&mut slice)?
-                );
-            }
-            CollectProtocolFeeEvent::DISCRIMINATOR => {
-                println!(
-                    "{:#?}",
-                    decode_event::<CollectProtocolFeeEvent>(&mut slice)?
                 );
             }
             CreatePersonalPositionEvent::DISCRIMINATOR => {
@@ -449,158 +442,6 @@ pub fn handle_program_instruction(
             }
             println!("{:#?}", UpdateOperationAccount::from(ix));
         }
-        instruction::TransferRewardOwner::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::TransferRewardOwner>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct TransferRewardOwner {
-                pub new_owner: Pubkey,
-            }
-            impl From<instruction::TransferRewardOwner> for TransferRewardOwner {
-                fn from(instr: instruction::TransferRewardOwner) -> TransferRewardOwner {
-                    TransferRewardOwner {
-                        new_owner: instr.new_owner,
-                    }
-                }
-            }
-            println!("{:#?}", TransferRewardOwner::from(ix));
-        }
-        instruction::InitializeReward::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::InitializeReward>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct InitializeReward {
-                pub param: InitializeRewardParam,
-            }
-            impl From<instruction::InitializeReward> for InitializeReward {
-                fn from(instr: instruction::InitializeReward) -> InitializeReward {
-                    InitializeReward { param: instr.param }
-                }
-            }
-            println!("{:#?}", InitializeReward::from(ix));
-        }
-        instruction::CollectRemainingRewards::DISCRIMINATOR => {
-            let ix =
-                decode_instruction::<instruction::CollectRemainingRewards>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct CollectRemainingRewards {
-                pub reward_index: u8,
-            }
-            impl From<instruction::CollectRemainingRewards> for CollectRemainingRewards {
-                fn from(instr: instruction::CollectRemainingRewards) -> CollectRemainingRewards {
-                    CollectRemainingRewards {
-                        reward_index: instr.reward_index,
-                    }
-                }
-            }
-            println!("{:#?}", CollectRemainingRewards::from(ix));
-        }
-        instruction::UpdateRewardInfos::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::UpdateRewardInfos>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct UpdateRewardInfos;
-            impl From<instruction::UpdateRewardInfos> for UpdateRewardInfos {
-                fn from(_instr: instruction::UpdateRewardInfos) -> UpdateRewardInfos {
-                    UpdateRewardInfos
-                }
-            }
-            println!("{:#?}", UpdateRewardInfos::from(ix));
-        }
-        instruction::SetRewardParams::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::SetRewardParams>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct SetRewardParams {
-                pub reward_index: u8,
-                pub emissions_per_second_x64: u128,
-                pub open_time: u64,
-                pub end_time: u64,
-            }
-            impl From<instruction::SetRewardParams> for SetRewardParams {
-                fn from(instr: instruction::SetRewardParams) -> SetRewardParams {
-                    SetRewardParams {
-                        reward_index: instr.reward_index,
-                        emissions_per_second_x64: instr.emissions_per_second_x64,
-                        open_time: instr.open_time,
-                        end_time: instr.end_time,
-                    }
-                }
-            }
-            println!("{:#?}", SetRewardParams::from(ix));
-        }
-        instruction::CollectProtocolFee::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::CollectProtocolFee>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct CollectProtocolFee {
-                pub amount_0_requested: u64,
-                pub amount_1_requested: u64,
-            }
-            impl From<instruction::CollectProtocolFee> for CollectProtocolFee {
-                fn from(instr: instruction::CollectProtocolFee) -> CollectProtocolFee {
-                    CollectProtocolFee {
-                        amount_0_requested: instr.amount_0_requested,
-                        amount_1_requested: instr.amount_1_requested,
-                    }
-                }
-            }
-            println!("{:#?}", CollectProtocolFee::from(ix));
-        }
-        instruction::CollectFundFee::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::CollectFundFee>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct CollectFundFee {
-                pub amount_0_requested: u64,
-                pub amount_1_requested: u64,
-            }
-            impl From<instruction::CollectFundFee> for CollectFundFee {
-                fn from(instr: instruction::CollectFundFee) -> CollectFundFee {
-                    CollectFundFee {
-                        amount_0_requested: instr.amount_0_requested,
-                        amount_1_requested: instr.amount_1_requested,
-                    }
-                }
-            }
-            println!("{:#?}", CollectFundFee::from(ix));
-        }
-        instruction::OpenPosition::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::OpenPosition>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct OpenPosition {
-                pub liquidity: u128,
-                pub amount_0_max: u64,
-                pub amount_1_max: u64,
-            }
-            impl From<instruction::OpenPosition> for OpenPosition {
-                fn from(instr: instruction::OpenPosition) -> OpenPosition {
-                    OpenPosition {
-                        liquidity: instr.liquidity,
-                        amount_0_max: instr.amount_0_max,
-                        amount_1_max: instr.amount_1_max,
-                    }
-                }
-            }
-            println!("{:#?}", OpenPosition::from(ix));
-        }
-        instruction::OpenPositionV2::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::OpenPositionV2>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct OpenPositionV2 {
-                pub liquidity: u128,
-                pub amount_0_max: u64,
-                pub amount_1_max: u64,
-                pub base_flag: Option<bool>,
-                pub with_metadata: bool,
-            }
-            impl From<instruction::OpenPositionV2> for OpenPositionV2 {
-                fn from(instr: instruction::OpenPositionV2) -> OpenPositionV2 {
-                    OpenPositionV2 {
-                        liquidity: instr.liquidity,
-                        amount_0_max: instr.amount_0_max,
-                        amount_1_max: instr.amount_1_max,
-                        base_flag: instr.base_flag,
-                        with_metadata: instr.with_metadata,
-                    }
-                }
-            }
-            println!("{:#?}", OpenPositionV2::from(ix));
-        }
         instruction::ClosePosition::DISCRIMINATOR => {
             let ix = decode_instruction::<instruction::ClosePosition>(&mut ix_data).unwrap();
             #[derive(Debug)]
@@ -611,84 +452,6 @@ pub fn handle_program_instruction(
                 }
             }
             println!("{:#?}", ClosePosition::from(ix));
-        }
-        instruction::IncreaseLiquidity::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::IncreaseLiquidity>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct IncreaseLiquidity {
-                pub liquidity: u128,
-                pub amount_0_max: u64,
-                pub amount_1_max: u64,
-            }
-            impl From<instruction::IncreaseLiquidity> for IncreaseLiquidity {
-                fn from(instr: instruction::IncreaseLiquidity) -> IncreaseLiquidity {
-                    IncreaseLiquidity {
-                        liquidity: instr.liquidity,
-                        amount_0_max: instr.amount_0_max,
-                        amount_1_max: instr.amount_1_max,
-                    }
-                }
-            }
-            println!("{:#?}", IncreaseLiquidity::from(ix));
-        }
-        instruction::IncreaseLiquidityV2::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::IncreaseLiquidityV2>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct IncreaseLiquidityV2 {
-                pub liquidity: u128,
-                pub amount_0_max: u64,
-                pub amount_1_max: u64,
-                pub base_flag: Option<bool>,
-            }
-            impl From<instruction::IncreaseLiquidityV2> for IncreaseLiquidityV2 {
-                fn from(instr: instruction::IncreaseLiquidityV2) -> IncreaseLiquidityV2 {
-                    IncreaseLiquidityV2 {
-                        liquidity: instr.liquidity,
-                        amount_0_max: instr.amount_0_max,
-                        amount_1_max: instr.amount_1_max,
-                        base_flag: instr.base_flag,
-                    }
-                }
-            }
-            println!("{:#?}", IncreaseLiquidityV2::from(ix));
-        }
-        instruction::DecreaseLiquidity::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::DecreaseLiquidity>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct DecreaseLiquidity {
-                pub liquidity: u128,
-                pub amount_0_min: u64,
-                pub amount_1_min: u64,
-            }
-            impl From<instruction::DecreaseLiquidity> for DecreaseLiquidity {
-                fn from(instr: instruction::DecreaseLiquidity) -> DecreaseLiquidity {
-                    DecreaseLiquidity {
-                        liquidity: instr.liquidity,
-                        amount_0_min: instr.amount_0_min,
-                        amount_1_min: instr.amount_1_min,
-                    }
-                }
-            }
-            println!("{:#?}", DecreaseLiquidity::from(ix));
-        }
-        instruction::DecreaseLiquidityV2::DISCRIMINATOR => {
-            let ix = decode_instruction::<instruction::DecreaseLiquidityV2>(&mut ix_data).unwrap();
-            #[derive(Debug)]
-            pub struct DecreaseLiquidityV2 {
-                pub liquidity: u128,
-                pub amount_0_min: u64,
-                pub amount_1_min: u64,
-            }
-            impl From<instruction::DecreaseLiquidityV2> for DecreaseLiquidityV2 {
-                fn from(instr: instruction::DecreaseLiquidityV2) -> DecreaseLiquidityV2 {
-                    DecreaseLiquidityV2 {
-                        liquidity: instr.liquidity,
-                        amount_0_min: instr.amount_0_min,
-                        amount_1_min: instr.amount_1_min,
-                    }
-                }
-            }
-            println!("{:#?}", DecreaseLiquidityV2::from(ix));
         }
         instruction::Swap::DISCRIMINATOR => {
             let ix = decode_instruction::<instruction::Swap>(&mut ix_data).unwrap();

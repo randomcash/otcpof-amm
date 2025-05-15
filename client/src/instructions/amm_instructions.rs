@@ -1,6 +1,5 @@
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
-use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::associated_token::spl_associated_token_account;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
@@ -195,89 +194,6 @@ pub fn create_pool_instr(
     Ok((instructions, pool_account_key))
 }
 
-pub fn open_position_instr(
-    config: &ClientConfig,
-    pool_account_key: Pubkey,
-    token_vault_0: Pubkey,
-    token_vault_1: Pubkey,
-    token_mint_0: Pubkey,
-    token_mint_1: Pubkey,
-    nft_mint_key: Pubkey,
-    nft_to_owner: Pubkey,
-    user_token_account_0: Pubkey,
-    user_token_account_1: Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
-    liquidity: u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
-    tick_lower_index: i32,
-    tick_upper_index: i32,
-    with_metadata: bool,
-) -> Result<Vec<Instruction>> {
-    let payer = read_keypair_file(&config.payer_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(payer));
-    let program = client.program(config.raydium_v3_program)?;
-    let nft_ata_token_account =
-        get_associated_token_address(&program.payer(), &nft_mint_key);
-    let (metadata_account_key, _bump) = Pubkey::find_program_address(
-        &[
-            mpl_token_metadata::accounts::Metadata::PREFIX,
-            mpl_token_metadata::ID.to_bytes().as_ref(),
-            nft_mint_key.to_bytes().as_ref(),
-        ],
-        &mpl_token_metadata::ID,
-    );
-    let (protocol_position_key, __bump) = Pubkey::find_program_address(
-        &[
-            POSITION_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
-        ],
-        &program.id(),
-    );
-
-    let (personal_position_key, __bump) = Pubkey::find_program_address(
-        &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
-        &program.id(),
-    );
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::OpenPositionV2 {
-            payer: program.payer(),
-            position_nft_owner: nft_to_owner,
-            position_nft_mint: nft_mint_key,
-            position_nft_account: nft_ata_token_account,
-            metadata_account: metadata_account_key,
-            pool_state: pool_account_key,
-            protocol_position: protocol_position_key,
-            personal_position: personal_position_key,
-            token_account_0: user_token_account_0,
-            token_account_1: user_token_account_1,
-            token_vault_0,
-            token_vault_1,
-            rent: sysvar::rent::id(),
-            system_program: system_program::id(),
-            token_program: spl_token::id(),
-            associated_token_program: spl_associated_token_account::id(),
-            token_program_2022: spl_token_2022::id(),
-            vault_0_mint: token_mint_0,
-            vault_1_mint: token_mint_1,
-        })
-        .accounts(remaining_accounts)
-        .args(raydium_instruction::OpenPositionV2 {
-            liquidity,
-            amount_0_max,
-            amount_1_max,
-            with_metadata,
-            base_flag: None,
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
 pub fn open_position_with_token22_nft_instr(
     config: &ClientConfig,
     pool_account_key: Pubkey,
@@ -291,8 +207,8 @@ pub fn open_position_with_token22_nft_instr(
     user_token_account_1: Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     liquidity: u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
+    amount_0: u64,
+    amount_1: u64,
     with_metadata: bool,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
@@ -341,132 +257,9 @@ pub fn open_position_with_token22_nft_instr(
         })
         .accounts(remaining_accounts)
         .args(raydium_instruction::OpenPositionWithToken22Nft {
-            liquidity,
-            amount_0_max,
-            amount_1_max,
+            amount_0,
+            amount_1,
             with_metadata,
-            base_flag: None,
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn increase_liquidity_instr(
-    config: &ClientConfig,
-    pool_account_key: Pubkey,
-    token_vault_0: Pubkey,
-    token_vault_1: Pubkey,
-    token_mint_0: Pubkey,
-    token_mint_1: Pubkey,
-    nft_mint_key: Pubkey,
-    nft_token_key: Pubkey,
-    user_token_account_0: Pubkey,
-    user_token_account_1: Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
-    liquidity: u128,
-    amount_0_max: u64,
-    amount_1_max: u64,
-) -> Result<Vec<Instruction>> {
-    let payer = read_keypair_file(&config.payer_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(payer));
-    let program = client.program(config.raydium_v3_program)?;
-    let (protocol_position_key, __bump) = Pubkey::find_program_address(
-        &[
-            POSITION_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-        ],
-        &program.id(),
-    );
-    let (personal_position_key, __bump) = Pubkey::find_program_address(
-        &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
-        &program.id(),
-    );
-
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::IncreaseLiquidityV2 {
-            nft_owner: program.payer(),
-            nft_account: nft_token_key,
-            pool_state: pool_account_key,
-            protocol_position: protocol_position_key,
-            personal_position: personal_position_key,
-            token_account_0: user_token_account_0,
-            token_account_1: user_token_account_1,
-            token_vault_0,
-            token_vault_1,
-            token_program: spl_token::id(),
-            token_program_2022: spl_token_2022::id(),
-            vault_0_mint: token_mint_0,
-            vault_1_mint: token_mint_1,
-        })
-        .accounts(remaining_accounts)
-        .args(raydium_instruction::IncreaseLiquidityV2 {
-            liquidity,
-            amount_0_max,
-            amount_1_max,
-            base_flag: None,
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn decrease_liquidity_instr(
-    config: &ClientConfig,
-    pool_account_key: Pubkey,
-    token_vault_0: Pubkey,
-    token_vault_1: Pubkey,
-    token_mint_0: Pubkey,
-    token_mint_1: Pubkey,
-    nft_mint_key: Pubkey,
-    nft_token_key: Pubkey,
-    user_token_account_0: Pubkey,
-    user_token_account_1: Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
-    liquidity: u128,
-    amount_0_min: u64,
-    amount_1_min: u64,
-) -> Result<Vec<Instruction>> {
-    let payer = read_keypair_file(&config.payer_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(payer));
-    let program = client.program(config.raydium_v3_program)?;
-    let (personal_position_key, __bump) = Pubkey::find_program_address(
-        &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
-        &program.id(),
-    );
-    let (protocol_position_key, __bump) = Pubkey::find_program_address(
-        &[
-            POSITION_SEED.as_bytes(),
-            pool_account_key.to_bytes().as_ref(),
-        ],
-        &program.id(),
-    );
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::DecreaseLiquidityV2 {
-            nft_owner: program.payer(),
-            nft_account: nft_token_key,
-            personal_position: personal_position_key,
-            pool_state: pool_account_key,
-            protocol_position: protocol_position_key,
-            token_vault_0,
-            token_vault_1,
-            recipient_token_account_0: user_token_account_0,
-            recipient_token_account_1: user_token_account_1,
-            token_program: spl_token::id(),
-            token_program_2022: spl_token_2022::id(),
-            memo_program: spl_memo::id(),
-            vault_0_mint: token_mint_0,
-            vault_1_mint: token_mint_1,
-        })
-        .accounts(remaining_accounts)
-        .args(raydium_instruction::DecreaseLiquidityV2 {
-            liquidity,
-            amount_0_min,
-            amount_1_min,
         })
         .instructions()?;
     Ok(instructions)
@@ -592,123 +385,6 @@ pub fn swap_v2_instr(
             sqrt_price_limit_x64: sqrt_price_limit_x64.unwrap_or(0u128),
             is_base_input,
         })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn initialize_reward_instr(
-    config: &ClientConfig,
-    pool_account_key: Pubkey,
-    amm_config: Pubkey,
-    operation_account_key: Pubkey,
-    reward_token_mint: Pubkey,
-    reward_token_vault: Pubkey,
-    user_reward_token: Pubkey,
-    reward_token_program: Pubkey,
-    open_time: u64,
-    end_time: u64,
-    emissions_per_second_x64: u128,
-) -> Result<Vec<Instruction>> {
-    let admin = read_keypair_file(&config.admin_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(admin));
-    let program = client.program(config.raydium_v3_program)?;
-
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::InitializeReward {
-            reward_funder: program.payer(),
-            funder_token_account: user_reward_token,
-            amm_config,
-            pool_state: pool_account_key,
-            operation_state: operation_account_key,
-            reward_token_mint,
-            reward_token_vault,
-            reward_token_program,
-            system_program: system_program::id(),
-            rent: sysvar::rent::id(),
-        })
-        .args(raydium_instruction::InitializeReward {
-            param: raydium_amm_v3::instructions::InitializeRewardParam {
-                open_time,
-                end_time,
-                emissions_per_second_x64,
-            },
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn set_reward_params_instr(
-    config: &ClientConfig,
-    amm_config: Pubkey,
-    pool_account_key: Pubkey,
-    reward_token_vault: Pubkey,
-    user_reward_token: Pubkey,
-    operation_account_key: Pubkey,
-    reward_index: u8,
-    open_time: u64,
-    end_time: u64,
-    emissions_per_second_x64: u128,
-) -> Result<Vec<Instruction>> {
-    let admin = read_keypair_file(&config.admin_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(admin));
-    let program = client.program(config.raydium_v3_program)?;
-
-    let remaining_accounts = vec![
-        AccountMeta::new(reward_token_vault, false),
-        AccountMeta::new(user_reward_token, false),
-        AccountMeta::new_readonly(spl_token::id(), false),
-    ];
-
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::SetRewardParams {
-            authority: program.payer(),
-            amm_config,
-            pool_state: pool_account_key,
-            operation_state: operation_account_key,
-            token_program: spl_token::id(),
-            token_program_2022: spl_token_2022::id(),
-        })
-        .accounts(remaining_accounts)
-        .args(raydium_instruction::SetRewardParams {
-            reward_index,
-            emissions_per_second_x64,
-            open_time,
-            end_time,
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn transfer_reward_owner(
-    config: &ClientConfig,
-    pool_account_key: Pubkey,
-    new_owner: Pubkey,
-    encode: bool,
-    authority: Option<Pubkey>,
-) -> Result<Vec<Instruction>> {
-    let admin = read_keypair_file(&config.admin_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(admin));
-    let program = client.program(config.raydium_v3_program)?;
-
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::TransferRewardOwner {
-            authority: if encode {
-                authority.unwrap()
-            } else {
-                program.payer()
-            },
-            pool_state: pool_account_key,
-        })
-        .args(raydium_instruction::TransferRewardOwner { new_owner })
         .instructions()?;
     Ok(instructions)
 }

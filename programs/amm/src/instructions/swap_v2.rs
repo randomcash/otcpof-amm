@@ -83,7 +83,7 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
 
     let block_timestamp = Clock::get()?.unix_timestamp as u64;
 
-    let amount_0 = 0;   //TODO: calculate this
+    let amount_0 = 0; //TODO: calculate this
     let amount_1 = 0;
     let zero_for_one;
     let swap_price_before;
@@ -271,12 +271,12 @@ pub fn exact_internal_v2<'c: 'info, 'info>(
         token_account_0: token_account_0.key(),
         token_account_1: token_account_1.key(),
         amount_0: amount_0_without_fee,
-        transfer_fee_0,
         amount_1: amount_1_without_fee,
+        transfer_fee_0,
         transfer_fee_1,
-        zero_for_one,
         sqrt_price_x64: pool_state.sqrt_price_x64,
-        liquidity: pool_state.liquidity,
+        liquidity_0: todo!(),
+        liquidity_1: todo!()
     });
     if zero_for_one {
         require_gt!(swap_price_before, pool_state.sqrt_price_x64);

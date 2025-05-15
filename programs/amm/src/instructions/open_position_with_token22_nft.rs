@@ -120,11 +120,9 @@ pub struct OpenPositionWithToken22Nft<'info> {
 
 pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, OpenPositionWithToken22Nft<'info>>,
-    liquidity: u128,
     amount_0_max: u64,
     amount_1_max: u64,
     with_metadata: bool,
-    base_flag: Option<bool>,
 ) -> Result<()> {
     create_position_nft_mint_with_extensions(
         &ctx.accounts.payer,
@@ -173,11 +171,9 @@ pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
         &ctx.remaining_accounts,
         ctx.bumps.protocol_position,
         ctx.bumps.personal_position,
-        liquidity,
         amount_0_max,
         amount_1_max,
         with_metadata,
-        base_flag,
         true,
     )
 }
