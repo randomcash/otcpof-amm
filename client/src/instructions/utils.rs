@@ -311,7 +311,7 @@ pub fn get_out_put_amount_and_remaining_accounts(
     zero_for_one: bool,
     is_base_input: bool,
     pool_config: &AmmConfig,
-    pool_state: &PoolState,
+    protocol_position_state: &ProtocolPositionState,
 ) -> Result<u64, &'static str> {
     let amount_calculated = swap_compute(
         zero_for_one,
@@ -319,7 +319,7 @@ pub fn get_out_put_amount_and_remaining_accounts(
         pool_config.trade_fee_rate,
         input_amount,
         sqrt_price_limit_x64.unwrap_or(0),
-        pool_state,
+        protocol_position_state,
     )?;
 
     Ok(amount_calculated)
@@ -331,7 +331,7 @@ fn swap_compute(
     fee: u32,
     amount_specified: u64,
     sqrt_price_limit_x64: u128,
-    pool_state: &PoolState,
+    protocol_position_state: &ProtocolPositionState,
 ) -> Result<u64, &'static str> {
     if amount_specified == 0 {
         return Result::Err("amountSpecified must not be 0");
@@ -340,7 +340,7 @@ fn swap_compute(
     let mut state = SwapState {
         amount_specified_remaining: amount_specified,
         amount_calculated: 0,
-        sqrt_price_x64: pool_state.sqrt_price_x64,
+        sqrt_price_x64: protocol_position_state.sqrt_price_x64,
         liquidity: 0,
     };
 

@@ -19,10 +19,8 @@ use anchor_spl::token_2022::{
 use anchor_spl::token_interface;
 use anchor_spl::token_interface::spl_token_metadata_interface;
 use mpl_token_metadata::types::DataV2;
-use std::cell::RefMut;
 #[cfg(feature = "enable-log")]
 use std::convert::identity;
-use std::ops::DerefMut;
 
 #[derive(Accounts)]
 pub struct OpenPosition<'info> {
@@ -79,7 +77,7 @@ pub struct OpenPosition<'info> {
         payer = payer,
         space = ProtocolPositionState::LEN
     )]
-    pub protocol_position: Box<Account<'info, ProtocolPositionState>>,
+    pub protocol_position: AccountLoader<'info, ProtocolPositionState>,
 
     /// personal position state
     #[account(
@@ -150,7 +148,7 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     position_nft_account: &'b AccountInfo<'info>,
     metadata_account: Option<&'b UncheckedAccount<'info>>,
     pool_state_loader: &'b AccountLoader<'info, PoolState>,
-    protocol_position: &'b mut Box<Account<'info, ProtocolPositionState>>,
+    protocol_position: &'b mut AccountLoader<'info, ProtocolPositionState>,
     personal_position: &'b mut Box<Account<'info, PersonalPositionState>>,
     token_account_0: &'b AccountInfo<'info>,
     token_account_1: &'b AccountInfo<'info>,
@@ -164,7 +162,6 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     token_program_2022: Option<&'b Program<'info, Token2022>>,
     vault_0_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
     vault_1_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
-    remaining_accounts: &'c [AccountInfo<'info>],
     protocol_position_bump: u8,
     personal_position_bump: u8,
     amount_0: u64,
@@ -178,9 +175,9 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     }
 
     // check if protocol position is initialized
-    let protocol_position = protocol_position.deref_mut();
+    let mut protocol_position = protocol_position.load_mut()?;
     if protocol_position.pool_id == Pubkey::default() {
-        protocol_position.bump = protocol_position_bump;
+        protocol_position.bump = [protocol_position_bump];
         protocol_position.pool_id = pool_state_loader.key();
     }
 
@@ -190,12 +187,11 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
         token_account_1,
         token_vault_0,
         token_vault_1,
-        protocol_position,
+        &mut protocol_position,
         token_program_2022,
         token_program,
         vault_0_mint,
         vault_1_mint,
-        pool_state,
         amount_0,
         amount_1,
     )?;
@@ -244,7 +240,6 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
     token_program: &'b Program<'info, Token>,
     vault_0_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
     vault_1_mint: Option<Box<InterfaceAccount<'info, token_interface::Mint>>>,
-    pool_state: &mut RefMut<PoolState>,
     amount_0: u64,
     amount_1: u64,
 ) -> Result<(u64, u64, u64, u64)> {

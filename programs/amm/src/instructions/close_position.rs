@@ -1,4 +1,3 @@
-use crate::error::ErrorCode;
 use crate::states::*;
 use crate::util::{burn, close_spl_account};
 use anchor_lang::prelude::*;

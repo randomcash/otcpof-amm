@@ -41,7 +41,7 @@ pub struct OpenPositionWithToken22Nft<'info> {
         payer = payer,
         space = ProtocolPositionState::LEN
     )]
-    pub protocol_position: Box<Account<'info, ProtocolPositionState>>,
+    pub protocol_position: AccountLoader<'info, ProtocolPositionState>,
 
     /// personal position state
     #[account(
@@ -168,7 +168,6 @@ pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
         Some(&ctx.accounts.token_program_2022),
         Some(ctx.accounts.vault_0_mint.clone()),
         Some(ctx.accounts.vault_1_mint.clone()),
-        &ctx.remaining_accounts,
         ctx.bumps.protocol_position,
         ctx.bumps.personal_position,
         amount_0_max,

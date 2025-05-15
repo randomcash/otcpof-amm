@@ -39,6 +39,9 @@ pub struct PoolState {
     // Pool creator
     pub owner: Pubkey,
 
+    /// Protocol position
+    pub protocol_position: Pubkey,
+
     /// Token pair of the pool, where token_mint_0 address < token_mint_1 address
     pub token_mint_0: Pubkey,
     pub token_mint_1: Pubkey,
@@ -57,15 +60,6 @@ pub struct PoolState {
     /// mint0 and mint1 decimals
     pub mint_decimals_0: u8,
     pub mint_decimals_1: u8,
-
-    /// The current price of the pool as a sqrt(token_1/token_0) Q64.64 value
-    pub sqrt_price_x64: u128,
-
-    /// The amounts in and out of swap token_0 and token_1
-    pub swap_in_amount_token_0: u128,
-    pub swap_out_amount_token_1: u128,
-    pub swap_in_amount_token_1: u128,
-    pub swap_out_amount_token_0: u128,
 
     /// Bitwise representation of the state of the pool
     /// bit0, 1: disable open position and increase liquidity, 0: normal
@@ -103,12 +97,12 @@ impl PoolState {
     pub fn initialize(
         &mut self,
         bump: u8,
-        sqrt_price_x64: u128,
         open_time: u64,
         pool_creator: Pubkey,
         token_vault_0: Pubkey,
         token_vault_1: Pubkey,
         amm_config: &Account<AmmConfig>,
+        protocol_position: &AccountInfo,
         token_mint_0: &InterfaceAccount<Mint>,
         token_mint_1: &InterfaceAccount<Mint>,
         observation_state_key: Pubkey,
@@ -116,17 +110,13 @@ impl PoolState {
         self.bump = [bump];
         self.amm_config = amm_config.key();
         self.owner = pool_creator.key();
+        self.protocol_position = protocol_position.key();
         self.token_mint_0 = token_mint_0.key();
         self.token_mint_1 = token_mint_1.key();
         self.mint_decimals_0 = token_mint_0.decimals;
         self.mint_decimals_1 = token_mint_1.decimals;
         self.token_vault_0 = token_vault_0;
         self.token_vault_1 = token_vault_1;
-        self.sqrt_price_x64 = sqrt_price_x64;
-        self.swap_in_amount_token_0 = 0;
-        self.swap_out_amount_token_1 = 0;
-        self.swap_in_amount_token_1 = 0;
-        self.swap_out_amount_token_0 = 0;
         self.status = 0;
         self.open_time = open_time;
         self.recent_epoch = get_recent_epoch()?;
@@ -213,10 +203,10 @@ pub struct SwapEvent {
     pub sqrt_price_x64: u128,
 
     /// The liquidity of token_0 the pool after the swap
-    pub liquidity_0: u128,
+    pub pool_liquidity_0: u128,
 
     /// The liquidity of token_1 the pool after the swap
-    pub liquidity_1: u128,
+    pub pool_liquidity_1: u128,
 }
 
 /// Emitted pool liquidity change when increase and decrease liquidity
@@ -242,11 +232,8 @@ pub mod pool_test {
     use super::*;
     use std::cell::RefCell;
 
-    pub fn build_pool(
-        sqrt_price_x64: u128,
-    ) -> RefCell<PoolState> {
+    pub fn build_pool() -> RefCell<PoolState> {
         let mut new_pool = PoolState::default();
-        new_pool.sqrt_price_x64 = sqrt_price_x64;
         new_pool.token_mint_0 = Pubkey::new_unique();
         new_pool.token_mint_1 = Pubkey::new_unique();
         new_pool.amm_config = Pubkey::new_unique();
@@ -493,16 +480,6 @@ pub mod pool_test {
             assert_eq!(unpack_mint_decimals_0, mint_decimals_0);
             let unpack_mint_decimals_1 = unpack_data.mint_decimals_1;
             assert_eq!(unpack_mint_decimals_1, mint_decimals_1);
-            let unpack_sqrt_price_x64 = unpack_data.sqrt_price_x64;
-            assert_eq!(unpack_sqrt_price_x64, sqrt_price_x64);
-            let unpack_swap_in_amount_token_0 = unpack_data.swap_in_amount_token_0;
-            assert_eq!(unpack_swap_in_amount_token_0, swap_in_amount_token_0);
-            let unpack_swap_out_amount_token_1 = unpack_data.swap_out_amount_token_1;
-            assert_eq!(unpack_swap_out_amount_token_1, swap_out_amount_token_1);
-            let unpack_swap_in_amount_token_1 = unpack_data.swap_in_amount_token_1;
-            assert_eq!(unpack_swap_in_amount_token_1, swap_in_amount_token_1);
-            let unpack_swap_out_amount_token_0 = unpack_data.swap_out_amount_token_0;
-            assert_eq!(unpack_swap_out_amount_token_0, swap_out_amount_token_0);
             let unpack_status = unpack_data.status;
             assert_eq!(unpack_status, status);
 

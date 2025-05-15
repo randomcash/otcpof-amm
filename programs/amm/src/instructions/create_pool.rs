@@ -29,6 +29,19 @@ pub struct CreatePool<'info> {
     )]
     pub pool_state: AccountLoader<'info, PoolState>,
 
+    /// Initialize an account to store the pool state
+    #[account(
+        init,
+        seeds = [
+            POSITION_SEED.as_bytes(),
+            pool_state.key().as_ref(),
+        ],
+        bump,
+        payer = pool_creator,
+        space = ProtocolPositionState::LEN
+    )]
+    pub protocol_position: AccountLoader<'info, ProtocolPositionState>,
+
     /// Token_0 mint, the key must be smaller then token_1 mint.
     #[account(
         constraint = token_mint_0.key() < token_mint_1.key(),
@@ -151,12 +164,12 @@ pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u6
     let bump = ctx.bumps.pool_state;
     pool_state.initialize(
         bump,
-        sqrt_price_x64,
-        0,
+        open_time,
         ctx.accounts.pool_creator.key(),
         ctx.accounts.token_vault_0.key(),
         ctx.accounts.token_vault_1.key(),
         ctx.accounts.amm_config.as_ref(),
+        ctx.accounts.protocol_position.as_ref(),
         ctx.accounts.token_mint_0.as_ref(),
         ctx.accounts.token_mint_1.as_ref(),
         ctx.accounts.observation_state.key(),

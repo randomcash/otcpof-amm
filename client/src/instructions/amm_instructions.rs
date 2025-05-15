@@ -147,6 +147,13 @@ pub fn create_pool_instr(
         ],
         &program.id(),
     );
+    let (protocol_position_key, __bump) = Pubkey::find_program_address(
+        &[
+            POSITION_SEED.as_bytes(),
+            pool_account_key.as_ref(),
+        ],
+        &program.id(),
+    );
     let (token_vault_0, __bump) = Pubkey::find_program_address(
         &[
             POOL_VAULT_SEED.as_bytes(),
@@ -185,6 +192,7 @@ pub fn create_pool_instr(
             token_program_1,
             system_program: system_program::id(),
             rent: sysvar::rent::id(),
+            protocol_position: protocol_position_key,
         })
         .args(raydium_instruction::CreatePool {
             sqrt_price_x64,
@@ -206,7 +214,6 @@ pub fn open_position_with_token22_nft_instr(
     user_token_account_0: Pubkey,
     user_token_account_1: Pubkey,
     remaining_accounts: Vec<AccountMeta>,
-    liquidity: u128,
     amount_0: u64,
     amount_1: u64,
     with_metadata: bool,
@@ -330,56 +337,6 @@ pub fn swap_instr(
         })
         .accounts(remaining_accounts)
         .args(raydium_instruction::Swap {
-            amount,
-            other_amount_threshold,
-            sqrt_price_limit_x64: sqrt_price_limit_x64.unwrap_or(0u128),
-            is_base_input,
-        })
-        .instructions()?;
-    Ok(instructions)
-}
-
-pub fn swap_v2_instr(
-    config: &ClientConfig,
-    amm_config: Pubkey,
-    pool_account_key: Pubkey,
-    input_vault: Pubkey,
-    output_vault: Pubkey,
-    observation_state: Pubkey,
-    user_input_token: Pubkey,
-    user_out_put_token: Pubkey,
-    input_vault_mint: Pubkey,
-    output_vault_mint: Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
-    amount: u64,
-    other_amount_threshold: u64,
-    sqrt_price_limit_x64: Option<u128>,
-    is_base_input: bool,
-) -> Result<Vec<Instruction>> {
-    let payer = read_keypair_file(&config.payer_path)?;
-    let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
-    // Client.
-    let client = Client::new(url, Rc::new(payer));
-    let program = client.program(config.raydium_v3_program)?;
-    let instructions = program
-        .request()
-        .accounts(raydium_accounts::SwapSingleV2 {
-            payer: program.payer(),
-            amm_config,
-            pool_state: pool_account_key,
-            input_token_account: user_input_token,
-            output_token_account: user_out_put_token,
-            input_vault,
-            output_vault,
-            observation_state,
-            token_program: spl_token::id(),
-            token_program_2022: spl_token_2022::id(),
-            memo_program: spl_memo::id(),
-            input_vault_mint,
-            output_vault_mint,
-        })
-        .accounts(remaining_accounts)
-        .args(raydium_instruction::SwapV2 {
             amount,
             other_amount_threshold,
             sqrt_price_limit_x64: sqrt_price_limit_x64.unwrap_or(0u128),

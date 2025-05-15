@@ -11,10 +11,7 @@ use anchor_client::solana_client::{
 };
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
-use anchor_spl::{
-    associated_token::spl_associated_token_account,
-    token::spl_token,
-};
+use anchor_spl::{associated_token::spl_associated_token_account, token::spl_token};
 use anyhow::{format_err, Result};
 use arrayref::array_ref;
 use clap::Parser;
@@ -307,7 +304,7 @@ pub enum CommandsName {
         protocol_fee_rate: u32,
         fund_fee_rate: u32,
         queue_type_0: u8,
-        queue_type_1: u8
+        queue_type_1: u8,
     },
     UpdateConfig {
         config_index: u16,
@@ -335,16 +332,6 @@ pub enum CommandsName {
         with_metadata: bool,
     },
     Swap {
-        input_token: Pubkey,
-        output_token: Pubkey,
-        #[arg(short, long)]
-        base_in: bool,
-        #[arg(short, long)]
-        simulate: bool,
-        amount: u64,
-        limit_price: Option<f64>,
-    },
-    SwapV2 {
         input_token: Pubkey,
         output_token: Pubkey,
         #[arg(short, long)]
@@ -616,7 +603,7 @@ fn main() -> Result<()> {
             protocol_fee_rate,
             fund_fee_rate,
             queue_type_0,
-            queue_type_1
+            queue_type_1,
         } => {
             let (create_instr, amm_config_key) = create_amm_config_instr(
                 &pool_config.clone(),
@@ -625,7 +612,7 @@ fn main() -> Result<()> {
                 protocol_fee_rate,
                 fund_fee_rate,
                 queue_type_0,
-                queue_type_1
+                queue_type_1,
             )?;
             // send
             let signers = vec![&payer, &admin];
@@ -785,7 +772,6 @@ fn main() -> Result<()> {
             let pool: raydium_amm_v3::states::PoolState =
                 program.account(pool_config.pool_id_account.unwrap())?;
 
-            let liquidity = 0; //TODO: calculate and define liquidity
             println!("amount_0:{}, amount_1:{}", amount_0, amount_1);
             // calc with slippage
             let amount_0_with_slippage =
@@ -870,7 +856,6 @@ fn main() -> Result<()> {
                         &transfer_fee.1.owner,
                     ),
                     remaining_accounts,
-                    liquidity,
                     amount_0_max,
                     amount_1_max,
                     with_metadata,
@@ -922,6 +907,12 @@ fn main() -> Result<()> {
             let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(
                 pool_account.as_ref().unwrap(),
             )?;
+
+            let rsps = rpc_client.get_multiple_accounts(&vec![pool_state.protocol_position])?;
+            let [protocol_position_state] = array_ref![rsps, 0, 1];
+            let protocol_position_state = deserialize_anchor_account::<
+                raydium_amm_v3::states::ProtocolPositionState,
+            >(protocol_position_state.as_ref().unwrap())?;
             let zero_for_one = user_input_state.base.mint == pool_state.token_mint_0
                 && user_output_state.base.mint == pool_state.token_mint_1;
 
@@ -941,7 +932,7 @@ fn main() -> Result<()> {
                 zero_for_one,
                 base_in,
                 &amm_config_state,
-                &pool_state,
+                &protocol_position_state,
             )
             .unwrap();
             println!(
@@ -1007,157 +998,6 @@ fn main() -> Result<()> {
                 println!("{}", signature);
             }
         }
-        CommandsName::SwapV2 {
-            input_token,
-            output_token,
-            base_in,
-            simulate,
-            amount,
-            limit_price,
-        } => {
-            // load mult account
-            let load_accounts = vec![
-                input_token,
-                output_token,
-                pool_config.amm_config_key,
-                pool_config.pool_id_account.unwrap(),
-                pool_config.mint0.unwrap(),
-                pool_config.mint1.unwrap(),
-            ];
-            let rsps = rpc_client.get_multiple_accounts(&load_accounts)?;
-            let epoch = rpc_client.get_epoch_info().unwrap().epoch;
-            let [user_input_account, user_output_account, amm_config_account, pool_account, mint0_account, mint1_account] =
-                array_ref![rsps, 0, 6];
-
-            let user_input_token_data = user_input_account.clone().unwrap().data;
-            let user_input_state = StateWithExtensions::<Account>::unpack(&user_input_token_data)?;
-            let user_output_token_data = user_output_account.clone().unwrap().data;
-            let user_output_state =
-                StateWithExtensions::<Account>::unpack(&user_output_token_data)?;
-            let mint0_data = mint0_account.clone().unwrap().data;
-            let mint0_state = StateWithExtensions::<Mint>::unpack(&mint0_data)?;
-            let mint1_data = mint1_account.clone().unwrap().data;
-            let mint1_state = StateWithExtensions::<Mint>::unpack(&mint1_data)?;
-            let amm_config_state = deserialize_anchor_account::<raydium_amm_v3::states::AmmConfig>(
-                amm_config_account.as_ref().unwrap(),
-            )?;
-            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(
-                pool_account.as_ref().unwrap(),
-            )?;
-
-            let zero_for_one = user_input_state.base.mint == pool_state.token_mint_0
-                && user_output_state.base.mint == pool_state.token_mint_1;
-
-            let transfer_fee = if base_in {
-                if zero_for_one {
-                    get_transfer_fee(&mint0_state, epoch, amount)
-                } else {
-                    get_transfer_fee(&mint1_state, epoch, amount)
-                }
-            } else {
-                0
-            };
-            let amount_specified = amount.checked_sub(transfer_fee).unwrap();
-
-            let mut sqrt_price_limit_x64 = None;
-            if limit_price.is_some() {
-                let sqrt_price_x64 = price_to_sqrt_price_x64(
-                    limit_price.unwrap(),
-                    pool_state.mint_decimals_0,
-                    pool_state.mint_decimals_1,
-                );
-                sqrt_price_limit_x64 = Some(sqrt_price_x64);
-            }
-
-            let mut other_amount_threshold = utils::get_out_put_amount_and_remaining_accounts(
-                amount_specified,
-                sqrt_price_limit_x64,
-                zero_for_one,
-                base_in,
-                &amm_config_state,
-                &pool_state,
-            )
-            .unwrap();
-            println!(
-                "amount:{}, other_amount_threshold:{}",
-                amount, other_amount_threshold
-            );
-            if base_in {
-                // calc mint out amount with slippage
-                other_amount_threshold =
-                    amount_with_slippage(other_amount_threshold, pool_config.slippage, false);
-            } else {
-                // calc max in with slippage
-                other_amount_threshold =
-                    amount_with_slippage(other_amount_threshold, pool_config.slippage, true);
-                // calc max in with transfer_fee
-                let transfer_fee = if zero_for_one {
-                    get_transfer_inverse_fee(&mint0_state, epoch, other_amount_threshold)
-                } else {
-                    get_transfer_inverse_fee(&mint1_state, epoch, other_amount_threshold)
-                };
-                other_amount_threshold += transfer_fee;
-            }
-
-            let mut remaining_accounts = Vec::new();
-            let mut accounts = Vec::new();
-            remaining_accounts.append(&mut accounts);
-            let mut instructions = Vec::new();
-            let request_inits_instr = ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
-            instructions.push(request_inits_instr);
-            let swap_instr = swap_v2_instr(
-                &pool_config.clone(),
-                pool_state.amm_config,
-                pool_config.pool_id_account.unwrap(),
-                if zero_for_one {
-                    pool_state.token_vault_0
-                } else {
-                    pool_state.token_vault_1
-                },
-                if zero_for_one {
-                    pool_state.token_vault_1
-                } else {
-                    pool_state.token_vault_0
-                },
-                pool_state.observation_key,
-                input_token,
-                output_token,
-                if zero_for_one {
-                    pool_state.token_mint_0
-                } else {
-                    pool_state.token_mint_1
-                },
-                if zero_for_one {
-                    pool_state.token_mint_1
-                } else {
-                    pool_state.token_mint_0
-                },
-                remaining_accounts,
-                amount,
-                other_amount_threshold,
-                sqrt_price_limit_x64,
-                base_in,
-            )
-            .unwrap();
-            instructions.extend(swap_instr);
-            // send
-            let signers = vec![&payer];
-            let recent_hash = rpc_client.get_latest_blockhash()?;
-            let txn = Transaction::new_signed_with_payer(
-                &instructions,
-                Some(&payer.pubkey()),
-                &signers,
-                recent_hash,
-            );
-            if simulate {
-                let ret =
-                    simulate_transaction(&rpc_client, &txn, true, CommitmentConfig::confirmed())?;
-                println!("{:#?}", ret);
-            } else {
-                let signature = send_txn(&rpc_client, &txn, true)?;
-                println!("{}", signature);
-            }
-        }
         CommandsName::PPositionByOwner { user_wallet } => {
             // load position
             let position_nft_infos = get_all_nft_and_position_by_owner(
@@ -1185,7 +1025,10 @@ fn main() -> Result<()> {
                             ],
                             &program.id(),
                         );
-                        println!("id:{}, amount_0:{}, amount_1:{}", personal_position_key, position.amount_0, position.amount_1);
+                        println!(
+                            "id:{}, amount_0:{}, amount_1:{}",
+                            personal_position_key, position.amount_0, position.amount_1
+                        );
                         user_positions.push(position);
                     }
                 }
@@ -1279,9 +1122,7 @@ fn main() -> Result<()> {
                 if personal_position.pool_id == pool_id {
                     println!(
                         "personal_position:{}, amount_0:{}, amount_1:{}",
-                        position.0,
-                        personal_position.amount_0,
-                        personal_position.amount_1
+                        position.0, personal_position.amount_0, personal_position.amount_1
                     );
                 }
             }
@@ -1318,10 +1159,12 @@ fn main() -> Result<()> {
                 let protocol_position = deserialize_anchor_account::<
                     raydium_amm_v3::states::ProtocolPositionState,
                 >(&position.1)?;
+                let liquidity_0 = protocol_position.liquidity_0;
+                let liquidity_1 = protocol_position.liquidity_1;
                 if protocol_position.pool_id == pool_id {
                     println!(
                         "protocol_position:{}, liquidity_0:{}, liquidity_1: {}",
-                        position.0, protocol_position.liquidity_0, protocol_position.liquidity_1
+                        position.0, liquidity_0, liquidity_1
                     );
                 }
             }

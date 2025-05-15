@@ -5,11 +5,12 @@ use anchor_lang::prelude::*;
 pub const POSITION_SEED: &str = "position";
 
 /// Protocol Position
-#[account]
+#[account(zero_copy(unsafe))]
+#[repr(C, packed)]
 #[derive(Default, Debug)]
 pub struct ProtocolPositionState {
     /// Bump to identify PDA
-    pub bump: u8,
+    pub bump: [u8; 1],
 
     /// The ID of the pool with which this token is connected
     pub pool_id: Pubkey,
@@ -24,12 +25,29 @@ pub struct ProtocolPositionState {
     /// tokens_1 on queue_1, ready to be swapped
     pub liquidity_1: u128,
 
+    /// The current price of the pool as a sqrt(token_1/token_0) Q64.64 value
+    pub sqrt_price_x64: u128,
+
+    /// The amounts in and out of swap token_0 and token_1
+    pub swap_in_amount_token_0: u128,
+    pub swap_out_amount_token_1: u128,
+    pub swap_in_amount_token_1: u128,
+    pub swap_out_amount_token_0: u128,
+
     // account update recent epoch
     pub recent_epoch: u64,
 }
 
 impl ProtocolPositionState {
     pub const LEN: usize = Self::DISCRIMINATOR.len() + std::mem::size_of::<Self>();
+
+    pub fn seeds(&self) -> [&[u8]; 3] {
+        [
+            &POSITION_SEED.as_bytes(),
+            self.pool_id.as_ref(),
+            self.bump.as_ref(),
+        ]
+    }
 
     pub fn update(
         &mut self,
