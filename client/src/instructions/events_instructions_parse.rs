@@ -142,12 +142,6 @@ pub fn handle_program_log(
             ConfigChangeEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<ConfigChangeEvent>(&mut slice)?);
             }
-            CollectPersonalFeeEvent::DISCRIMINATOR => {
-                println!(
-                    "{:#?}",
-                    decode_event::<CollectPersonalFeeEvent>(&mut slice)?
-                );
-            }
             CreatePersonalPositionEvent::DISCRIMINATOR => {
                 println!(
                     "{:#?}",
@@ -160,20 +154,8 @@ pub fn handle_program_log(
             IncreaseLiquidityEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<IncreaseLiquidityEvent>(&mut slice)?);
             }
-            LiquidityCalculateEvent::DISCRIMINATOR => {
-                println!(
-                    "{:#?}",
-                    decode_event::<LiquidityCalculateEvent>(&mut slice)?
-                );
-            }
             LiquidityChangeEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<LiquidityChangeEvent>(&mut slice)?);
-            }
-            // PriceChangeEvent::DISCRIMINATOR => {
-            //     println!("{:#?}", decode_event::<PriceChangeEvent>(&mut slice)?);
-            // }
-            SwapEvent::DISCRIMINATOR => {
-                println!("{:#?}", decode_event::<SwapEvent>(&mut slice)?);
             }
             PoolCreatedEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<PoolCreatedEvent>(&mut slice)?);

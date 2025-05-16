@@ -4,6 +4,9 @@ use anchor_spl::associated_token::spl_associated_token_account;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
 use anyhow::Result;
+use raydium_amm_v3::states::POOL_QUEUE_SEED;
+use raydium_amm_v3::states::POOL_QUEUE_SEED_SIDE_0;
+use raydium_amm_v3::states::POOL_QUEUE_SEED_SIDE_1;
 use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Signer, system_program, sysvar,
 };
@@ -177,6 +180,23 @@ pub fn create_pool_instr(
         ],
         &program.id(),
     );
+
+    let (token_queue_0, __bump) = Pubkey::find_program_address(
+        &[
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_0,
+            pool_account_key.to_bytes().as_ref(),
+        ],
+        &program.id(),
+    );
+    let (token_queue_1, __bump) = Pubkey::find_program_address(
+        &[
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_1,
+            pool_account_key.to_bytes().as_ref(),
+        ],
+        &program.id(),
+    );
     let instructions = program
         .request()
         .accounts(raydium_accounts::CreatePool {
@@ -193,6 +213,8 @@ pub fn create_pool_instr(
             system_program: system_program::id(),
             rent: sysvar::rent::id(),
             protocol_position: protocol_position_key,
+            token_queue_0,
+            token_queue_1,
         })
         .args(raydium_instruction::CreatePool {
             sqrt_price_x64,
@@ -229,15 +251,32 @@ pub fn open_position_with_token22_nft_instr(
             &nft_mint_key,
             &spl_token_2022::id(),
         );
-    let (protocol_position_key, __bump) = Pubkey::find_program_address(
+        let (protocol_position_key, __bump) = Pubkey::find_program_address(
         &[
-            POSITION_SEED.as_bytes(),
+                POSITION_SEED.as_bytes(),
+                pool_account_key.to_bytes().as_ref(),
+            ],
+            &program.id(),
+        );
+    dbg!(protocol_position_key);
+    let (personal_position_key, __bump) = Pubkey::find_program_address(
+        &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
+        &program.id(),
+    );
+    let (token_queue_0, __bump) = Pubkey::find_program_address(
+        &[
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_0,
             pool_account_key.to_bytes().as_ref(),
         ],
         &program.id(),
     );
-    let (personal_position_key, __bump) = Pubkey::find_program_address(
-        &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
+    let (token_queue_1, __bump) = Pubkey::find_program_address(
+        &[
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_1,
+            pool_account_key.to_bytes().as_ref(),
+        ],
         &program.id(),
     );
     let instructions = program
@@ -261,6 +300,8 @@ pub fn open_position_with_token22_nft_instr(
             token_program_2022: spl_token_2022::id(),
             vault_0_mint: token_mint_0,
             vault_1_mint: token_mint_1,
+            token_queue_0,
+            token_queue_1,
         })
         .accounts(remaining_accounts)
         .args(raydium_instruction::OpenPositionWithToken22Nft {

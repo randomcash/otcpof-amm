@@ -7,7 +7,6 @@ use anchor_spl::token::Token;
 use anchor_spl::token_interface::{Mint, Token2022, TokenAccount};
 
 #[derive(Accounts)]
-#[instruction(tick_lower_index: i32, tick_upper_index: i32,tick_array_lower_start_index:i32,tick_array_upper_start_index:i32)]
 pub struct OpenPositionWithToken22Nft<'info> {
     /// Pays to mint the position
     #[account(mut)]
@@ -34,8 +33,6 @@ pub struct OpenPositionWithToken22Nft<'info> {
         seeds = [
             POSITION_SEED.as_bytes(),
             pool_state.key().as_ref(),
-            &tick_lower_index.to_be_bytes(),
-            &tick_upper_index.to_be_bytes(),
         ],
         bump,
         payer = payer,
@@ -81,6 +78,20 @@ pub struct OpenPositionWithToken22Nft<'info> {
     )]
     pub token_vault_1: Box<InterfaceAccount<'info, TokenAccount>>,
 
+    /// The queue that holds pool tokens for token_0
+    #[account(
+        mut,
+        constraint = token_queue_0.key() == pool_state.load()?.token_queue_0
+    )]
+    pub token_queue_0: AccountLoader<'info, PoolQueue>,
+
+    /// The queue that holds pool tokens for token_1
+    #[account(
+        mut,
+        constraint = token_queue_1.key() == pool_state.load()?.token_queue_1
+    )]
+    pub token_queue_1: AccountLoader<'info, PoolQueue>,
+
     /// Sysvar for token mint and ATA creation
     pub rent: Sysvar<'info, Rent>,
 
@@ -107,21 +118,12 @@ pub struct OpenPositionWithToken22Nft<'info> {
         address = token_vault_1.mint
     )]
     pub vault_1_mint: Box<InterfaceAccount<'info, Mint>>,
-    // remaining account
-    // #[account(
-    //     seeds = [
-    //         POOL_TICK_ARRAY_BITMAP_SEED.as_bytes(),
-    //         pool_state.key().as_ref(),
-    //     ],
-    //     bump
-    // )]
-    // pub tick_array_bitmap: AccountLoader<'info, TickArrayBitmapExtension>,
 }
 
 pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, OpenPositionWithToken22Nft<'info>>,
-    amount_0_max: u64,
-    amount_1_max: u64,
+    amount_0: u64,
+    amount_1: u64,
     with_metadata: bool,
 ) -> Result<()> {
     create_position_nft_mint_with_extensions(
@@ -160,18 +162,19 @@ pub fn open_position_with_token22_nft<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.token_account_1.to_account_info(),
         &ctx.accounts.token_vault_0.to_account_info(),
         &ctx.accounts.token_vault_1.to_account_info(),
+        &ctx.accounts.token_queue_0,
+        &ctx.accounts.token_queue_1,
         &ctx.accounts.rent,
         &ctx.accounts.system_program,
         &ctx.accounts.token_program,
         &ctx.accounts.associated_token_program,
-        //None,
         Some(&ctx.accounts.token_program_2022),
         Some(ctx.accounts.vault_0_mint.clone()),
         Some(ctx.accounts.vault_1_mint.clone()),
         ctx.bumps.protocol_position,
         ctx.bumps.personal_position,
-        amount_0_max,
-        amount_1_max,
+        amount_0,
+        amount_1,
         with_metadata,
         true,
     )

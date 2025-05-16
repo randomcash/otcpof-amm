@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::util::get_recent_epoch;
+
 use super::POSITION_SEED;
 
 #[account]
@@ -15,9 +17,9 @@ pub struct PersonalPositionState {
     pub pool_id: Pubkey,
 
     /// The amount of token_0 owned by this position
-    pub amount_0: u128,
+    pub amount_0: u64,
     /// The amount of token_1 owned by this position
-    pub amount_1: u128,
+    pub amount_1: u64,
 
     // account update recent epoch
     pub recent_epoch: u64,
@@ -33,13 +35,31 @@ impl PersonalPositionState {
             self.bump.as_ref(),
         ]
     }
+
+    pub fn initialize(
+        &mut self,
+        bump: u8,
+        nft_mint: Pubkey,
+        pool_id: Pubkey,
+        amount_0: u64,
+        amount_1: u64,
+    ) -> Result<()> {
+        self.pool_id = pool_id;
+        self.bump = [bump];
+        self.nft_mint = nft_mint;
+        self.amount_0 = amount_0;
+        self.amount_1 = amount_1;
+        self.recent_epoch = get_recent_epoch()?;
+        
+        Ok(())
+    }
 }
 /// Emitted when create a new position
 #[event]
 #[cfg_attr(feature = "client", derive(Debug))]
 pub struct CreatePersonalPositionEvent {
     /// The pool for which liquidity was added
-    pub pool_state: Pubkey,
+    pub pool_id: Pubkey,
 
     /// The address that create the position
     pub minter: Pubkey,
@@ -99,42 +119,4 @@ pub struct DecreaseLiquidityEvent {
     pub transfer_fee_0: u64,
     /// The amount of token_1 transfer fee
     pub transfer_fee_1: u64,
-}
-
-/// Emitted when liquidity decreased or increase.
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct LiquidityCalculateEvent {
-    /// The pool liquidity before decrease or increase
-    pub pool_liquidity: u128,
-    /// The pool price when decrease or increase in liquidity
-    pub pool_sqrt_price_x64: u128,
-    /// The amount of token_0 that was calculated for the decrease or increase in liquidity
-    pub calc_amount_0: u64,
-    /// The amount of token_1 that was calculated for the decrease or increase in liquidity
-    pub calc_amount_1: u64,
-    /// The amount of token_0 transfer fee without trade_fee_amount_0
-    pub transfer_fee_0: u64,
-    /// The amount of token_1 transfer fee without trade_fee_amount_0
-    pub transfer_fee_1: u64,
-}
-
-/// Emitted when tokens are collected for a position
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct CollectPersonalFeeEvent {
-    /// The ID of the token for which underlying tokens were collected
-    pub position_nft_mint: Pubkey,
-
-    /// The token account that received the collected token_0 tokens
-    pub recipient_token_account_0: Pubkey,
-
-    /// The token account that received the collected token_1 tokens
-    pub recipient_token_account_1: Pubkey,
-
-    /// The amount of token_0 owed to the position that was collected
-    pub amount_0: u64,
-
-    /// The amount of token_1 owed to the position that was collected
-    pub amount_1: u64,
 }

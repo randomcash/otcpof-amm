@@ -1,4 +1,5 @@
 use crate::error::ErrorCode;
+use crate::libraries::Queue;
 use crate::states::*;
 use crate::util::*;
 use anchor_lang::prelude::*;
@@ -7,7 +8,7 @@ use anchor_lang::system_program;
 use anchor_lang::system_program::{transfer, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::mpl_token_metadata::types::Creator;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::Token;
 use anchor_spl::token_2022::spl_token_2022::extension::{
     BaseStateWithExtensions, StateWithExtensions,
 };
@@ -22,125 +23,6 @@ use mpl_token_metadata::types::DataV2;
 #[cfg(feature = "enable-log")]
 use std::convert::identity;
 
-#[derive(Accounts)]
-pub struct OpenPosition<'info> {
-    /// Pays to mint the position
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    /// Which config the pool belongs to.
-    #[account(
-        mut,
-        constraint = amm_config.key() == pool_state.load()?.amm_config
-    )]
-    pub amm_config: Box<Account<'info, AmmConfig>>,
-
-    /// CHECK: Receives the position NFT
-    pub position_nft_owner: UncheckedAccount<'info>,
-
-    /// Unique token mint address
-    #[account(
-        init,
-        mint::decimals = 0,
-        mint::authority = pool_state.key(),
-        payer = payer,
-    )]
-    pub position_nft_mint: Box<Account<'info, Mint>>,
-
-    /// Token account where position NFT will be minted
-    /// This account created in the contract by cpi to avoid large stack variables
-    #[account(
-        init,
-        associated_token::mint = position_nft_mint,
-        associated_token::authority = position_nft_owner,
-        payer = payer,
-    )]
-    pub position_nft_account: Box<Account<'info, TokenAccount>>,
-
-    /// To store metaplex metadata
-    /// CHECK: Safety check performed inside function body
-    #[account(mut)]
-    pub metadata_account: UncheckedAccount<'info>,
-
-    /// Add liquidity for this pool
-    #[account(mut)]
-    pub pool_state: AccountLoader<'info, PoolState>,
-
-    /// Store the information of market marking in range
-    #[account(
-        init_if_needed,
-        seeds = [
-            POSITION_SEED.as_bytes(),
-            pool_state.key().as_ref(),
-        ],
-        bump,
-        payer = payer,
-        space = ProtocolPositionState::LEN
-    )]
-    pub protocol_position: AccountLoader<'info, ProtocolPositionState>,
-
-    /// personal position state
-    #[account(
-        init,
-        seeds = [POSITION_SEED.as_bytes(), position_nft_mint.key().as_ref()],
-        bump,
-        payer = payer,
-        space = PersonalPositionState::LEN
-    )]
-    pub personal_position: Box<Account<'info, PersonalPositionState>>,
-
-    /// The token_0 account deposit token to the pool
-    #[account(
-        mut,
-        token::mint = token_vault_0.mint
-    )]
-    pub token_account_0: Box<Account<'info, TokenAccount>>,
-
-    /// The token_1 account deposit token to the pool
-    #[account(
-        mut,
-        token::mint = token_vault_1.mint
-    )]
-    pub token_account_1: Box<Account<'info, TokenAccount>>,
-
-    /// The address that holds pool tokens for token_0
-    #[account(
-        mut,
-        constraint = token_vault_0.key() == pool_state.load()?.token_vault_0
-    )]
-    pub token_vault_0: Box<Account<'info, TokenAccount>>,
-
-    /// The address that holds pool tokens for token_1
-    #[account(
-        mut,
-        constraint = token_vault_1.key() == pool_state.load()?.token_vault_1
-    )]
-    pub token_vault_1: Box<Account<'info, TokenAccount>>,
-
-    /// Sysvar for token mint and ATA creation
-    pub rent: Sysvar<'info, Rent>,
-
-    /// Program to create the position manager state account
-    pub system_program: Program<'info, System>,
-
-    /// Program to create mint account and mint tokens
-    pub token_program: Program<'info, Token>,
-    /// Program to create an ATA for receiving position NFT
-    pub associated_token_program: Program<'info, AssociatedToken>,
-    // /// Program to create NFT metadata
-    // /// CHECK: Metadata program address constraint applied
-    //pub metadata_program: Program<'info, Metadata>,
-    // remaining account
-    // #[account(
-    //     seeds = [
-    //         POOL_TICK_ARRAY_BITMAP_SEED.as_bytes(),
-    //         pool_state.key().as_ref(),
-    //     ],
-    //     bump
-    // )]
-    // pub tick_array_bitmap: AccountLoader<'info, TickArrayBitmapExtension>,
-}
-
 pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     payer: &'b Signer<'info>,
     position_nft_owner: &'b UncheckedAccount<'info>,
@@ -154,6 +36,8 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     token_account_1: &'b AccountInfo<'info>,
     token_vault_0: &'b AccountInfo<'info>,
     token_vault_1: &'b AccountInfo<'info>,
+    token_queue_0: &'b AccountLoader<'info, PoolQueue>,
+    token_queue_1: &'b AccountLoader<'info, PoolQueue>,
     rent: &'b Sysvar<'info, Rent>,
     system_program: &'b Program<'info, System>,
     token_program: &'b Program<'info, Token>,
@@ -169,7 +53,7 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     with_metadata: bool,
     use_metadata_extension: bool,
 ) -> Result<()> {
-    let pool_state = &mut pool_state_loader.load_mut()?;
+    let pool_state = pool_state_loader.load()?;
     if !pool_state.get_status_by_bit(PoolStatusBitIndex::OpenPositionOrIncreaseLiquidity) {
         return err!(ErrorCode::NotApproved);
     }
@@ -177,10 +61,13 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
     // check if protocol position is initialized
     let mut protocol_position = protocol_position.load_mut()?;
     if protocol_position.pool_id == Pubkey::default() {
-        protocol_position.bump = [protocol_position_bump];
-        protocol_position.pool_id = pool_state_loader.key();
+        protocol_position.initialize(protocol_position_bump, pool_state_loader.key())?;
     }
 
+    let liquidity_before_0 = protocol_position.liquidity_0;
+    let liquidity_before_1 = protocol_position.liquidity_1;
+
+    // Move liquidity into pool
     let (amount_0, amount_1, amount_0_transfer_fee, amount_1_transfer_fee) = add_liquidity(
         payer,
         token_account_0,
@@ -195,22 +82,15 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
         amount_0,
         amount_1,
     )?;
-
-    // let personal_position = &mut personal_position;
-    personal_position.bump = [personal_position_bump];
-    personal_position.nft_mint = position_nft_mint.key();
-    personal_position.pool_id = pool_state_loader.key();
-
-    emit!(CreatePersonalPositionEvent {
+    emit!(LiquidityChangeEvent {
         pool_state: pool_state_loader.key(),
-        minter: payer.key(),
-        nft_owner: position_nft_owner.key(),
-        deposit_amount_0: amount_0,
-        deposit_amount_1: amount_1,
-        deposit_amount_0_transfer_fee: amount_0_transfer_fee,
-        deposit_amount_1_transfer_fee: amount_1_transfer_fee
+        liquidity_before_0,
+        liquidity_before_1,
+        liquidity_after_0: protocol_position.liquidity_0,
+        liquidity_after_1: protocol_position.liquidity_1
     });
 
+    // Mint position nft and remove authority
     mint_nft_and_remove_mint_authority(
         payer,
         pool_state_loader,
@@ -225,7 +105,49 @@ pub fn open_position<'a, 'b, 'c: 'info, 'info>(
         rent,
         with_metadata,
         use_metadata_extension,
-    )
+    )?;
+    personal_position.initialize(
+        personal_position_bump,
+        position_nft_mint.key(),
+        pool_state_loader.key(),
+        amount_0,
+        amount_1,
+    )?;
+    emit!(CreatePersonalPositionEvent {
+        pool_id: pool_state_loader.key(),
+        minter: payer.key(),
+        nft_owner: position_nft_owner.key(),
+        deposit_amount_0: amount_0,
+        deposit_amount_1: amount_1,
+        deposit_amount_0_transfer_fee: amount_0_transfer_fee,
+        deposit_amount_1_transfer_fee: amount_1_transfer_fee
+    });
+
+    // Push position into pool queue
+    if amount_0 > 0 {
+        let mut token_queue_0 = token_queue_0.load_mut()?;
+        token_queue_0.push(personal_position.key())?;
+        emit!(PositionPushedToQueueEvent {
+            pool_id: pool_state_loader.key(),
+            minter: payer.key(),
+            nft_owner: position_nft_owner.key(),
+            position_address: personal_position.key(),
+            queue_position: token_queue_0.len()
+        });
+    }
+    if amount_1 > 0 {
+        let mut token_queue_1 = token_queue_1.load_mut()?;
+        token_queue_1.push(personal_position.key())?;
+        emit!(PositionPushedToQueueEvent {
+            pool_id: pool_state_loader.key(),
+            minter: payer.key(),
+            nft_owner: position_nft_owner.key(),
+            position_address: personal_position.key(),
+            queue_position: token_queue_1.len()
+        });
+    }
+
+    Ok(())
 }
 
 /// Add liquidity to an initialized pool
@@ -258,23 +180,6 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
         amount_1_transfer_fee =
             get_transfer_inverse_fee(vault_1_mint.clone().unwrap(), amount_1).unwrap();
     }
-
-    /*emit!(LiquidityCalculateEvent {
-        pool_liquidity: liquidity_before,
-        pool_sqrt_price_x64: pool_state.sqrt_price_x64,
-        calc_amount_0: amount_0,
-        calc_amount_1: amount_1,
-        transfer_fee_0: amount_0_transfer_fee,
-        transfer_fee_1: amount_1_transfer_fee,
-    });*/
-    #[cfg(feature = "enable-log")]
-    msg!(
-        "amount_0: {}, amount_0_transfer_fee: {}, amount_1: {}, amount_1_transfer_fee: {}",
-        amount_0,
-        amount_0_transfer_fee,
-        amount_1,
-        amount_1_transfer_fee
-    );
     require_gte!(
         amount_0,
         amount_0 + amount_0_transfer_fee,
@@ -309,11 +214,10 @@ pub fn add_liquidity<'b, 'c: 'info, 'info>(
         amount_1 + amount_1_transfer_fee,
     )?;
 
-    /*emit!(LiquidityChangeEvent {
-        pool_state: pool_state.key(),
-        liquidity_before: liquidity_before,
-        liquidity_after: pool_state.liquidity,
-    });*/
+    let delta_0 = i64::try_from(amount_0)?;
+    let delta_1 = i64::try_from(amount_1)?;
+    protocol_position.update(delta_0, delta_1, delta_0, delta_0)?;
+
     Ok((
         amount_0,
         amount_1,

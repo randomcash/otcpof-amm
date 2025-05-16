@@ -13,7 +13,7 @@ use anchor_lang::prelude::*;
 /// * `x` - The liquidity (L) before change
 /// * `y` - The delta (ΔL) by which liquidity should be changed
 ///
-pub fn add_delta(x: u128, y: i128) -> Result<u128> {
+pub fn add_delta_128(x: u128, y: i128) -> Result<u128> {
     let z: u128;
     if y < 0 {
         z = x - u128::try_from(-y).unwrap();
@@ -25,6 +25,27 @@ pub fn add_delta(x: u128, y: i128) -> Result<u128> {
 
     Ok(z)
 }
+
+/// Add a signed liquidity delta to liquidity and revert if it overflows or underflows
+///
+/// # Arguments
+///
+/// * `x` - The liquidity (L) before change
+/// * `y` - The delta (ΔL) by which liquidity should be changed
+///
+pub fn add_delta_64(x: u64, y: i64) -> Result<u64> {
+    let z: u64;
+    if y < 0 {
+        z = x - u64::try_from(-y)?;
+        require_gt!(x, z, ErrorCode::LiquiditySubValueErr);
+    } else {
+        z = x + u64::try_from(y)?;
+        require_gte!(z, x, ErrorCode::LiquidityAddValueErr);
+    }
+
+    Ok(z)
+}
+
 
 /// Computes the amount of liquidity received for a given amount of token_0 and price range
 /// Calculates ΔL = Δx (√P_upper x √P_lower)/(√P_upper - √P_lower)

@@ -101,6 +101,8 @@ impl PoolState {
         pool_creator: Pubkey,
         token_vault_0: Pubkey,
         token_vault_1: Pubkey,
+        token_queue_0: Pubkey,
+        token_queue_1: Pubkey,
         amm_config: &Account<AmmConfig>,
         protocol_position: &AccountInfo,
         token_mint_0: &InterfaceAccount<Mint>,
@@ -113,6 +115,8 @@ impl PoolState {
         self.protocol_position = protocol_position.key();
         self.token_mint_0 = token_mint_0.key();
         self.token_mint_1 = token_mint_1.key();
+        self.token_queue_0 = token_queue_0.key();
+        self.token_queue_1 = token_queue_1.key();
         self.mint_decimals_0 = token_mint_0.decimals;
         self.mint_decimals_1 = token_mint_1.decimals;
         self.token_vault_0 = token_vault_0;
@@ -167,64 +171,6 @@ pub struct PoolCreatedEvent {
     pub token_vault_0: Pubkey,
     /// Vault of token_1
     pub token_vault_1: Pubkey,
-}
-
-/// Emitted by when a swap is performed for a pool
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct SwapEvent {
-    /// The pool for which token_0 and token_1 were swapped
-    pub pool_state: Pubkey,
-
-    /// The address that initiated the swap call, and that received the callback
-    pub sender: Pubkey,
-
-    /// The payer token account in zero for one swaps, or the recipient token account
-    /// in one for zero swaps
-    pub token_account_0: Pubkey,
-
-    /// The payer token account in one for zero swaps, or the recipient token account
-    /// in zero for one swaps
-    pub token_account_1: Pubkey,
-
-    /// The real delta amount of the token_0 of the pool or user
-    pub amount_0: u64,
-
-    /// The transfer fee charged by the withheld_amount of the token_0
-    pub transfer_fee_0: u64,
-
-    /// The real delta of the token_1 of the pool or user
-    pub amount_1: u64,
-
-    /// The transfer fee charged by the withheld_amount of the token_1
-    pub transfer_fee_1: u64,
-
-    /// The sqrt(price) of the pool after the swap, as a Q64.64
-    pub sqrt_price_x64: u128,
-
-    /// The liquidity of token_0 the pool after the swap
-    pub pool_liquidity_0: u128,
-
-    /// The liquidity of token_1 the pool after the swap
-    pub pool_liquidity_1: u128,
-}
-
-/// Emitted pool liquidity change when increase and decrease liquidity
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct LiquidityChangeEvent {
-    /// The pool for swap
-    pub pool_state: Pubkey,
-
-    /// The liquidity of the pool before liquidity change
-    pub liquidity_before_0: u128,
-    /// The liquidity of the pool before liquidity change
-    pub liquidity_before_1: u128,
-
-    /// The liquidity of the pool after liquidity change
-    pub liquidity_after_0: u128,
-    /// The liquidity of the pool after liquidity change
-    pub liquidity_after_1: u128,
 }
 
 #[cfg(test)]

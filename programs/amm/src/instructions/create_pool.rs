@@ -100,6 +100,34 @@ pub struct CreatePool<'info> {
     )]
     pub observation_state: AccountLoader<'info, ObservationState>,
 
+    /// CHECK: loaded manually depending on queue type defined by AmmConfig
+    #[account(
+        init,
+        seeds = [
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_0,
+            pool_state.key().as_ref()
+        ],
+        bump,
+        payer = pool_creator,
+        space = PoolQueue::LEN
+    )]
+    pub token_queue_0: AccountLoader<'info, PoolQueue>,
+
+    /// CHECK: loaded manually depending on queue type defined by AmmConfig
+    #[account(
+        init,
+        seeds = [
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_1,
+            pool_state.key().as_ref()
+        ],
+        bump,
+        payer = pool_creator,
+        space = PoolQueue::LEN
+    )]
+    pub token_queue_1: AccountLoader<'info, PoolQueue>,
+
     /// Spl token program or token program 2022
     pub token_program_0: Interface<'info, TokenInterface>,
     /// Spl token program or token program 2022
@@ -128,7 +156,8 @@ pub struct CreatePool<'info> {
     // pub support_mint1_associated: Account<'info, SupportMintAssociated>,
 }
 
-pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u64) -> Result<()> {
+pub fn create_pool<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, CreatePool<'info>>, sqrt_price_x64: u128, open_time: u64) -> Result<()> {
     let mint0_associated_is_initialized = util::support_mint_associated_is_initialized(
         &ctx.remaining_accounts,
         &ctx.accounts.token_mint_0,
@@ -146,28 +175,37 @@ pub fn create_pool(ctx: Context<CreatePool>, sqrt_price_x64: u128, open_time: u6
     }
     let block_timestamp = clock::Clock::get()?.unix_timestamp as u64;
     require_gt!(block_timestamp, open_time);
-    let pool_id = ctx.accounts.pool_state.key();
-    let mut pool_state = ctx.accounts.pool_state.load_init()?;
-
-    #[cfg(feature = "enable-log")]
-    msg!(
-        "create pool, init_price: {}, init_tick:{}",
-        sqrt_price_x64,
-        tick
-    );
+    
     // init observation
+    let pool_id = ctx.accounts.pool_state.key();
     ctx.accounts
         .observation_state
         .load_init()?
         .initialize(pool_id)?;
 
-    let bump = ctx.bumps.pool_state;
+    // init queues
+    let queue_bump_0 = ctx.bumps.token_queue_0;
+    let mut queue_0 = ctx.accounts.token_queue_0.load_init()?;
+    queue_0.initialize(queue_bump_0, pool_id, ctx.accounts.amm_config.queue_type_0)?;
+    let queue_bump_1 = ctx.bumps.token_queue_1;
+    let mut queue_1 = ctx.accounts.token_queue_1.load_init()?;
+    queue_1.initialize(queue_bump_1, pool_id, ctx.accounts.amm_config.queue_type_1)?;
+
+    // init protocol position
+    let mut protocol_position = ctx.accounts.protocol_position.load_init()?;
+    protocol_position.initialize(ctx.bumps.protocol_position, pool_id)?;
+
+    // init pool
+    let mut pool_state = ctx.accounts.pool_state.load_init()?;
+    let pool_state_bump = ctx.bumps.pool_state;
     pool_state.initialize(
-        bump,
+        pool_state_bump,
         open_time,
         ctx.accounts.pool_creator.key(),
         ctx.accounts.token_vault_0.key(),
         ctx.accounts.token_vault_1.key(),
+        ctx.accounts.token_queue_0.key(),
+        ctx.accounts.token_queue_1.key(),
         ctx.accounts.amm_config.as_ref(),
         ctx.accounts.protocol_position.as_ref(),
         ctx.accounts.token_mint_0.as_ref(),

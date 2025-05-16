@@ -326,6 +326,7 @@ pub enum CommandsName {
         open_time: u64,
     },
     OpenPosition {
+        pool_address: Pubkey,
         amount_0: u64,
         amount_1: u64,
         #[arg(short, long)]
@@ -764,13 +765,16 @@ fn main() -> Result<()> {
             println!("signature: {}", signature);
         }
         CommandsName::OpenPosition {
+            pool_address,
             amount_0,
             amount_1,
             with_metadata,
         } => {
             // load pool to get observation
-            let pool: raydium_amm_v3::states::PoolState =
-                program.account(pool_config.pool_id_account.unwrap())?;
+            let pool: raydium_amm_v3::states::PoolState = 
+                program.account(pool_address)?;
+
+
 
             println!("amount_0:{}, amount_1:{}", amount_0, amount_1);
             // calc with slippage
@@ -822,7 +826,7 @@ fn main() -> Result<()> {
             }
             let mut find_position = raydium_amm_v3::states::PersonalPositionState::default();
             for position in user_positions {
-                if position.pool_id == pool_config.pool_id_account.unwrap() {
+                if position.pool_id == pool_address {
                     find_position = position.clone();
                 }
             }
@@ -836,25 +840,30 @@ fn main() -> Result<()> {
                 let request_inits_instr =
                     ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
                 instructions.push(request_inits_instr);
+
+                let user_token_account_0 = spl_associated_token_account::get_associated_token_address_with_program_id(
+                    &payer.pubkey(),
+                    &pool.token_mint_0,
+                    &transfer_fee.0.owner,
+                );
+                let user_token_account_1 = spl_associated_token_account::get_associated_token_address_with_program_id(
+                    &payer.pubkey(),
+                    &pool.token_mint_1,
+                    &transfer_fee.1.owner,
+                );
+                dbg!(&user_token_account_0, &user_token_account_1);
+
                 let open_position_instr = open_position_with_token22_nft_instr(
                     &pool_config.clone(),
-                    pool_config.pool_id_account.unwrap(),
+                    pool_address,
                     pool.token_vault_0,
                     pool.token_vault_1,
                     pool.token_mint_0,
                     pool.token_mint_1,
                     nft_mint.pubkey(),
                     payer.pubkey(),
-                    spl_associated_token_account::get_associated_token_address_with_program_id(
-                        &payer.pubkey(),
-                        &pool_config.mint0.unwrap(),
-                        &transfer_fee.0.owner,
-                    ),
-                    spl_associated_token_account::get_associated_token_address_with_program_id(
-                        &payer.pubkey(),
-                        &pool_config.mint1.unwrap(),
-                        &transfer_fee.1.owner,
-                    ),
+                    user_token_account_0,
+                    user_token_account_1, 
                     remaining_accounts,
                     amount_0_max,
                     amount_1_max,
