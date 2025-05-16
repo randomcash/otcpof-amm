@@ -771,11 +771,7 @@ fn main() -> Result<()> {
             with_metadata,
         } => {
             // load pool to get observation
-            let pool: raydium_amm_v3::states::PoolState = 
-                program.account(pool_address)?;
-
-
-
+            let pool: raydium_amm_v3::states::PoolState = program.account(pool_address)?;
             println!("amount_0:{}, amount_1:{}", amount_0, amount_1);
             // calc with slippage
             let amount_0_with_slippage =
@@ -824,36 +820,38 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            let mut find_position = raydium_amm_v3::states::PersonalPositionState::default();
+
+            /*let mut find_position = raydium_amm_v3::states::PersonalPositionState::default();
             for position in user_positions {
                 if position.pool_id == pool_address {
                     find_position = position.clone();
                 }
-            }
-            if find_position.nft_mint == Pubkey::default() {
-                // personal position not exist
-                // new nft mint
-                let nft_mint = Keypair::new();
-                let remaining_accounts = Vec::new();
+            }*/
 
-                let mut instructions = Vec::new();
-                let request_inits_instr =
-                    ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
-                instructions.push(request_inits_instr);
+            // personal position not exist
+            // new nft mint
+            let nft_mint = Keypair::new();
+            let remaining_accounts = Vec::new();
 
-                let user_token_account_0 = spl_associated_token_account::get_associated_token_address_with_program_id(
+            let mut instructions = Vec::new();
+            let request_inits_instr = ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
+            instructions.push(request_inits_instr);
+
+            let user_token_account_0 =
+                spl_associated_token_account::get_associated_token_address_with_program_id(
                     &payer.pubkey(),
                     &pool.token_mint_0,
                     &transfer_fee.0.owner,
                 );
-                let user_token_account_1 = spl_associated_token_account::get_associated_token_address_with_program_id(
+            let user_token_account_1 =
+                spl_associated_token_account::get_associated_token_address_with_program_id(
                     &payer.pubkey(),
                     &pool.token_mint_1,
                     &transfer_fee.1.owner,
                 );
-                dbg!(&user_token_account_0, &user_token_account_1);
 
-                let open_position_instr = open_position_with_token22_nft_instr(
+            let (open_position_instr, nft_mint_key, nft_ata_token_account) =
+                open_position_with_token22_nft_instr(
                     &pool_config.clone(),
                     pool_address,
                     pool.token_vault_0,
@@ -863,28 +861,26 @@ fn main() -> Result<()> {
                     nft_mint.pubkey(),
                     payer.pubkey(),
                     user_token_account_0,
-                    user_token_account_1, 
+                    user_token_account_1,
                     remaining_accounts,
                     amount_0_max,
                     amount_1_max,
                     with_metadata,
                 )?;
-                instructions.extend(open_position_instr);
-                // send
-                let signers = vec![&payer, &nft_mint];
-                let recent_hash = rpc_client.get_latest_blockhash()?;
-                let txn = Transaction::new_signed_with_payer(
-                    &instructions,
-                    Some(&payer.pubkey()),
-                    &signers,
-                    recent_hash,
-                );
-                let signature = send_txn(&rpc_client, &txn, true)?;
-                println!("{}", signature);
-            } else {
-                // personal position exist
-                println!("personal position exist:{:?}", find_position);
-            }
+            instructions.extend(open_position_instr);
+            // send
+            let signers = vec![&payer, &nft_mint];
+            let recent_hash = rpc_client.get_latest_blockhash()?;
+            let txn = Transaction::new_signed_with_payer(
+                &instructions,
+                Some(&payer.pubkey()),
+                &signers,
+                recent_hash,
+            );
+            let signature = send_txn(&rpc_client, &txn, true)?;
+            println!("nft_mint_key: {}", nft_mint_key);
+            println!("nft_ata_token_account: {}", nft_ata_token_account);
+            println!("signature: {}", signature);
         }
         CommandsName::Swap {
             input_token,

@@ -239,7 +239,7 @@ pub fn open_position_with_token22_nft_instr(
     amount_0: u64,
     amount_1: u64,
     with_metadata: bool,
-) -> Result<Vec<Instruction>> {
+) -> Result<(Vec<Instruction>, Pubkey, Pubkey)> {
     let payer = read_keypair_file(&config.payer_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
     // Client.
@@ -258,7 +258,6 @@ pub fn open_position_with_token22_nft_instr(
             ],
             &program.id(),
         );
-    dbg!(protocol_position_key);
     let (personal_position_key, __bump) = Pubkey::find_program_address(
         &[POSITION_SEED.as_bytes(), nft_mint_key.to_bytes().as_ref()],
         &program.id(),
@@ -310,7 +309,7 @@ pub fn open_position_with_token22_nft_instr(
             with_metadata,
         })
         .instructions()?;
-    Ok(instructions)
+    Ok((instructions, nft_mint_key, nft_ata_token_account))
 }
 
 pub fn close_personal_position_instr(
