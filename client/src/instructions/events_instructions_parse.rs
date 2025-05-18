@@ -4,8 +4,8 @@ use anchor_lang::Discriminator;
 use anyhow::Result;
 use colorful::Color;
 use colorful::Colorful;
+use raydium_amm_v3::events::*;
 use raydium_amm_v3::instruction;
-use raydium_amm_v3::states::*;
 use regex::Regex;
 use solana_sdk::bs58;
 use solana_transaction_status::{
@@ -142,26 +142,29 @@ pub fn handle_program_log(
             ConfigChangeEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<ConfigChangeEvent>(&mut slice)?);
             }
+            PoolCreatedEvent::DISCRIMINATOR => {
+                println!("{:#?}", decode_event::<PoolCreatedEvent>(&mut slice)?);
+            }
             CreatePersonalPositionEvent::DISCRIMINATOR => {
                 println!(
                     "{:#?}",
                     decode_event::<CreatePersonalPositionEvent>(&mut slice)?
                 );
             }
-            DecreaseLiquidityEvent::DISCRIMINATOR => {
-                println!("{:#?}", decode_event::<DecreaseLiquidityEvent>(&mut slice)?);
-            }
-            IncreaseLiquidityEvent::DISCRIMINATOR => {
-                println!("{:#?}", decode_event::<IncreaseLiquidityEvent>(&mut slice)?);
+            ChangePersonalPosition::DISCRIMINATOR => {
+                println!("{:#?}", decode_event::<ChangePersonalPosition>(&mut slice)?);
             }
             LiquidityChangeEvent::DISCRIMINATOR => {
                 println!("{:#?}", decode_event::<LiquidityChangeEvent>(&mut slice)?);
             }
-            PoolCreatedEvent::DISCRIMINATOR => {
-                println!("{:#?}", decode_event::<PoolCreatedEvent>(&mut slice)?);
-            }
-            _ => {
-                println!("unknow event: {}", l);
+            PositionPushedToQueueEvent::DISCRIMINATOR => {
+                println!("{:#?}", decode_event::<PositionPushedToQueueEvent>(&mut slice)?);
+            },
+            SwapEvent::DISCRIMINATOR => {
+                println!("{:#?}", decode_event::<SwapEvent>(&mut slice)?);
+            },
+            p => {
+                println!("{:#?}", p)
             }
         }
         return Ok((None, false));
@@ -438,20 +441,10 @@ pub fn handle_program_instruction(
         instruction::Swap::DISCRIMINATOR => {
             let ix = decode_instruction::<instruction::Swap>(&mut ix_data).unwrap();
             #[derive(Debug)]
-            pub struct Swap {
-                pub amount: u64,
-                pub other_amount_threshold: u64,
-                pub sqrt_price_limit_x64: u128,
-                pub is_base_input: bool,
-            }
+            pub struct Swap;
             impl From<instruction::Swap> for Swap {
-                fn from(instr: instruction::Swap) -> Swap {
-                    Swap {
-                        amount: instr.amount,
-                        other_amount_threshold: instr.other_amount_threshold,
-                        sqrt_price_limit_x64: instr.sqrt_price_limit_x64,
-                        is_base_input: instr.is_base_input,
-                    }
+                fn from(_instr: instruction::Swap) -> Swap {
+                    Swap
                 }
             }
             println!("{:#?}", Swap::from(ix));

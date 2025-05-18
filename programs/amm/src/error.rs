@@ -92,5 +92,7 @@ pub enum ErrorCode {
     CalculateOverflow,
 
     #[msg("Queue is full")]
-    QueueFull
+    QueueFull,
+    #[msg("Price feed error")]
+    PriceFeedErr
 }

@@ -11,11 +11,12 @@ use anchor_client::solana_client::{
 };
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
-use anchor_spl::{associated_token::spl_associated_token_account, token::spl_token};
+use anchor_spl::{associated_token::spl_associated_token_account, token::{self, spl_token}};
 use anyhow::{format_err, Result};
 use arrayref::array_ref;
 use clap::Parser;
 use configparser::ini::Ini;
+use raydium_amm_v3::libraries::Queue;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     compute_budget::ComputeBudgetInstruction,
@@ -305,6 +306,7 @@ pub enum CommandsName {
         fund_fee_rate: u32,
         queue_type_0: u8,
         queue_type_1: u8,
+        price_feed_max_age: u64
     },
     UpdateConfig {
         config_index: u16,
@@ -322,6 +324,7 @@ pub enum CommandsName {
         price: f64,
         mint0: Pubkey,
         mint1: Pubkey,
+        price_feed: Pubkey,
         #[arg(short, long, default_value_t = 0)]
         open_time: u64,
     },
@@ -333,14 +336,9 @@ pub enum CommandsName {
         with_metadata: bool,
     },
     Swap {
-        input_token: Pubkey,
-        output_token: Pubkey,
-        #[arg(short, long)]
-        base_in: bool,
+        pool_address: Pubkey,
         #[arg(short, long)]
         simulate: bool,
-        amount: u64,
-        limit_price: Option<f64>,
     },
     PPositionByOwner {
         user_wallet: Pubkey,
@@ -605,6 +603,7 @@ fn main() -> Result<()> {
             fund_fee_rate,
             queue_type_0,
             queue_type_1,
+            price_feed_max_age
         } => {
             let (create_instr, amm_config_key) = create_amm_config_instr(
                 &pool_config.clone(),
@@ -614,6 +613,7 @@ fn main() -> Result<()> {
                 fund_fee_rate,
                 queue_type_0,
                 queue_type_1,
+                price_feed_max_age
             )?;
             // send
             let signers = vec![&payer, &admin];
@@ -714,6 +714,7 @@ fn main() -> Result<()> {
             mint0,
             mint1,
             open_time,
+            price_feed
         } => {
             let mut price = price;
             let mut mint0 = mint0;
@@ -743,6 +744,7 @@ fn main() -> Result<()> {
             let (create_pool_instr, pool_account_address) = create_pool_instr(
                 &pool_config.clone(),
                 amm_config_key,
+                price_feed,
                 mint0,
                 mint1,
                 mint0_owner,
@@ -883,76 +885,24 @@ fn main() -> Result<()> {
             println!("signature: {}", signature);
         }
         CommandsName::Swap {
-            input_token,
-            output_token,
-            base_in,
+            pool_address,
             simulate,
-            amount,
-            limit_price,
         } => {
-            // load mult account
-            let load_accounts = vec![
-                input_token,
-                output_token,
-                pool_config.amm_config_key,
-                pool_config.pool_id_account.unwrap(),
+            let pool_state_account = rpc_client.get_account(&pool_address)?;
+            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(&pool_state_account)?;
+
+            let token_queue_accounts = vec![
+                pool_state.token_queue_0,
+                pool_state.token_queue_1
             ];
-            let rsps = rpc_client.get_multiple_accounts(&load_accounts)?;
-            let [user_input_account, user_output_account, amm_config_account, pool_account] =
-                array_ref![rsps, 0, 4];
-            let user_input_state =
-                StateWithExtensions::<Account>::unpack(&user_input_account.as_ref().unwrap().data)
-                    .unwrap();
-            let user_output_state =
-                StateWithExtensions::<Account>::unpack(&user_output_account.as_ref().unwrap().data)
-                    .unwrap();
-            let amm_config_state = deserialize_anchor_account::<raydium_amm_v3::states::AmmConfig>(
-                amm_config_account.as_ref().unwrap(),
+            let rsps = rpc_client.get_multiple_accounts(&token_queue_accounts)?;
+            let [token_queue_0_account, token_queue_1_account] = array_ref![rsps, 0, 2];
+            let token_queue_0 = deserialize_anchor_account::<raydium_amm_v3::states::PoolQueue>(
+                &token_queue_0_account.as_ref().unwrap(),
             )?;
-            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(
-                pool_account.as_ref().unwrap(),
+            let token_queue_1 = deserialize_anchor_account::<raydium_amm_v3::states::PoolQueue>(
+                &token_queue_1_account.as_ref().unwrap(),
             )?;
-
-            let rsps = rpc_client.get_multiple_accounts(&vec![pool_state.protocol_position])?;
-            let [protocol_position_state] = array_ref![rsps, 0, 1];
-            let protocol_position_state = deserialize_anchor_account::<
-                raydium_amm_v3::states::ProtocolPositionState,
-            >(protocol_position_state.as_ref().unwrap())?;
-            let zero_for_one = user_input_state.base.mint == pool_state.token_mint_0
-                && user_output_state.base.mint == pool_state.token_mint_1;
-
-            let mut sqrt_price_limit_x64 = None;
-            if limit_price.is_some() {
-                let sqrt_price_x64 = price_to_sqrt_price_x64(
-                    limit_price.unwrap(),
-                    pool_state.mint_decimals_0,
-                    pool_state.mint_decimals_1,
-                );
-                sqrt_price_limit_x64 = Some(sqrt_price_x64);
-            }
-
-            let mut other_amount_threshold = utils::get_out_put_amount_and_remaining_accounts(
-                amount,
-                sqrt_price_limit_x64,
-                zero_for_one,
-                base_in,
-                &amm_config_state,
-                &protocol_position_state,
-            )
-            .unwrap();
-            println!(
-                "amount:{}, other_amount_threshold:{}",
-                amount, other_amount_threshold
-            );
-            if base_in {
-                // min out
-                other_amount_threshold =
-                    amount_with_slippage(other_amount_threshold, pool_config.slippage, false);
-            } else {
-                // max in
-                other_amount_threshold =
-                    amount_with_slippage(other_amount_threshold, pool_config.slippage, true);
-            }
 
             let mut remaining_accounts = Vec::new();
             let mut accounts = Vec::new();
@@ -960,30 +910,19 @@ fn main() -> Result<()> {
             let mut instructions = Vec::new();
             let request_inits_instr = ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
             instructions.push(request_inits_instr);
+            
             let swap_instr = swap_instr(
                 &pool_config.clone(),
                 pool_state.amm_config,
-                pool_config.pool_id_account.unwrap(),
-                if zero_for_one {
-                    pool_state.token_vault_0
-                } else {
-                    pool_state.token_vault_1
-                },
-                if zero_for_one {
-                    pool_state.token_vault_1
-                } else {
-                    pool_state.token_vault_0
-                },
-                pool_state.observation_key,
-                input_token,
-                output_token,
+                pool_address,
+                pool_state.protocol_position,
+                pool_state.token_queue_0,
+                pool_state.token_queue_1,
+                token_queue_0.peek().expect("token_queue_0 head"),
+                token_queue_1.peek().expect("token_queue_1 head"),
+                pool_state.price_feed,
                 remaining_accounts,
-                amount,
-                other_amount_threshold,
-                sqrt_price_limit_x64,
-                base_in,
-            )
-            .unwrap();
+            )?;
             instructions.extend(swap_instr);
             // send
             let signers = vec![&payer];

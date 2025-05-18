@@ -57,6 +57,9 @@ pub struct PoolState {
     /// observation account key
     pub observation_key: Pubkey,
 
+    /// Price feed for pool
+    pub price_feed: Pubkey,
+
     /// mint0 and mint1 decimals
     pub mint_decimals_0: u8,
     pub mint_decimals_1: u8,
@@ -108,6 +111,7 @@ impl PoolState {
         token_mint_0: &InterfaceAccount<Mint>,
         token_mint_1: &InterfaceAccount<Mint>,
         observation_state_key: Pubkey,
+        price_feed: Pubkey,
     ) -> Result<()> {
         self.bump = [bump];
         self.amm_config = amm_config.key();
@@ -125,6 +129,7 @@ impl PoolState {
         self.open_time = open_time;
         self.recent_epoch = get_recent_epoch()?;
         self.observation_key = observation_state_key;
+        self.price_feed = price_feed;
 
         Ok(())
     }
@@ -148,29 +153,6 @@ impl PoolState {
         let status = u8::from(1) << (bit as u8);
         self.status.bitand(status) == 0
     }
-}
-
-/// Emitted when a pool is created and initialized with a starting price
-///
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct PoolCreatedEvent {
-    /// The first token of the pool by address sort order
-    pub token_mint_0: Pubkey,
-
-    /// The second token of the pool by address sort order
-    pub token_mint_1: Pubkey,
-
-    /// The address of the created pool
-    pub pool_state: Pubkey,
-
-    /// The initial sqrt price of the pool, as a Q64.64
-    pub sqrt_price_x64: u128,
-
-    /// Vault of token_0
-    pub token_vault_0: Pubkey,
-    /// Vault of token_1
-    pub token_vault_1: Pubkey,
 }
 
 #[cfg(test)]

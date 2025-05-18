@@ -1,4 +1,5 @@
 use crate::error::ErrorCode;
+use crate::events::PoolCreatedEvent;
 use crate::states::*;
 use crate::util;
 use anchor_lang::prelude::*;
@@ -100,6 +101,9 @@ pub struct CreatePool<'info> {
     )]
     pub observation_state: AccountLoader<'info, ObservationState>,
 
+    /// Which config the pool belongs to.
+    pub price_feed: Box<Account<'info, AmmConfig>>,
+
     /// CHECK: loaded manually depending on queue type defined by AmmConfig
     #[account(
         init,
@@ -136,24 +140,6 @@ pub struct CreatePool<'info> {
     pub system_program: Program<'info, System>,
     /// Sysvar for program account
     pub rent: Sysvar<'info, Rent>,
-    // remaining account
-    // #[account(
-    //     seeds = [
-    //     SUPPORT_MINT_SEED.as_bytes(),
-    //     token_mint_0.key().as_ref(),
-    // ],
-    //     bump
-    // )]
-    // pub support_mint0_associated: Account<'info, SupportMintAssociated>,
-
-    // #[account(
-    //     seeds = [
-    //     SUPPORT_MINT_SEED.as_bytes(),
-    //     token_mint_1.key().as_ref(),
-    // ],
-    //     bump
-    // )]
-    // pub support_mint1_associated: Account<'info, SupportMintAssociated>,
 }
 
 pub fn create_pool<'a, 'b, 'c: 'info, 'info>(
@@ -211,6 +197,7 @@ pub fn create_pool<'a, 'b, 'c: 'info, 'info>(
         ctx.accounts.token_mint_0.as_ref(),
         ctx.accounts.token_mint_1.as_ref(),
         ctx.accounts.observation_state.key(),
+        ctx.accounts.price_feed.key()
     )?;
 
     emit!(PoolCreatedEvent {

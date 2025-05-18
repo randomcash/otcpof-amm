@@ -1,5 +1,6 @@
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
+use anchor_lang::Key;
 use anchor_spl::associated_token::spl_associated_token_account;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
@@ -27,7 +28,8 @@ pub fn create_amm_config_instr(
     protocol_fee_rate: u32,
     fund_fee_rate: u32,
     queue_type_0: u8,
-    queue_type_1: u8
+    queue_type_1: u8,
+    price_feed_max_age: u64,
 ) -> Result<(Vec<Instruction>, Pubkey)> {
     let payer = read_keypair_file(&config.admin_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
@@ -52,6 +54,7 @@ pub fn create_amm_config_instr(
             fund_fee_rate,
             queue_type_0,
             queue_type_1,
+            price_feed_max_age
         })
         .instructions()?;
     Ok((instructions, amm_config_key))
@@ -129,6 +132,7 @@ pub fn update_operation_account_instr(
 pub fn create_pool_instr(
     config: &ClientConfig,
     amm_config: Pubkey,
+    price_feed: Pubkey,
     token_mint_0: Pubkey,
     token_mint_1: Pubkey,
     token_program_0: Pubkey,
@@ -215,6 +219,7 @@ pub fn create_pool_instr(
             protocol_position: protocol_position_key,
             token_queue_0,
             token_queue_1,
+            price_feed
         })
         .args(raydium_instruction::CreatePool {
             sqrt_price_x64,
@@ -346,16 +351,13 @@ pub fn swap_instr(
     config: &ClientConfig,
     amm_config: Pubkey,
     pool_account_key: Pubkey,
-    input_vault: Pubkey,
-    output_vault: Pubkey,
-    observation_state: Pubkey,
-    user_input_token: Pubkey,
-    user_out_put_token: Pubkey,
+    protocol_position: Pubkey,
+    token_queue_0: Pubkey,
+    token_queue_1: Pubkey,
+    pool_head_0: Pubkey,
+    pool_head_1: Pubkey,
+    price_feed: Pubkey,
     remaining_accounts: Vec<AccountMeta>,
-    amount: u64,
-    other_amount_threshold: u64,
-    sqrt_price_limit_x64: Option<u128>,
-    is_base_input: bool,
 ) -> Result<Vec<Instruction>> {
     let payer = read_keypair_file(&config.payer_path)?;
     let url = Cluster::Custom(config.http_url.clone(), config.ws_url.clone());
@@ -364,24 +366,21 @@ pub fn swap_instr(
     let program = client.program(config.raydium_v3_program)?;
     let instructions = program
         .request()
-        .accounts(raydium_accounts::SwapSingle {
+        .accounts(raydium_accounts::Swap {
             payer: program.payer(),
             amm_config,
-            pool_state: pool_account_key,
-            input_token_account: user_input_token,
-            output_token_account: user_out_put_token,
-            input_vault,
-            output_vault,
-            observation_state,
-            token_program: spl_token::id(),
+            pool_state_loader: pool_account_key.key(),
+            protocol_position,
+            pool_head_0,
+            pool_head_1,
+            token_queue_0,
+            token_queue_1,
+            price_feed,
+            system_program: system_program::id(),
+            clock: solana_sdk::sysvar::clock::id(),
         })
         .accounts(remaining_accounts)
-        .args(raydium_instruction::Swap {
-            amount,
-            other_amount_threshold,
-            sqrt_price_limit_x64: sqrt_price_limit_x64.unwrap_or(0u128),
-            is_base_input,
-        })
+        .args(raydium_instruction::Swap {})
         .instructions()?;
     Ok(instructions)
 }

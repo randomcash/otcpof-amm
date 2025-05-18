@@ -29,7 +29,8 @@ pub struct AmmConfig {
     /// Queue 1 configuration
     pub queue_type_1: QueueType,
 
-    pub padding: [u64; 3],
+    /// Max age for price feed
+    pub price_feed_max_age: u64,
 }
 
 impl AmmConfig {
@@ -46,18 +47,4 @@ impl AmmConfig {
         );
         Ok(())
     }
-}
-
-/// Emitted when create or update a config
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct ConfigChangeEvent {
-    pub index: u16,
-    pub owner: Pubkey,
-    pub protocol_fee_rate: u32,
-    pub trade_fee_rate: u32,
-    pub fund_fee_rate: u32,
-    pub fund_owner: Pubkey,
-    pub queue_type_0: QueueType,
-    pub queue_type_1: QueueType,
 }

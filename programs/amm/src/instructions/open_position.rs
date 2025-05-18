@@ -1,4 +1,7 @@
 use crate::error::ErrorCode;
+use crate::events::CreatePersonalPositionEvent;
+use crate::events::LiquidityChangeEvent;
+use crate::events::PositionPushedToQueueEvent;
 use crate::libraries::Queue;
 use crate::states::*;
 use crate::util::*;

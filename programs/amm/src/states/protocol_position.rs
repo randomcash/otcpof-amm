@@ -80,22 +80,3 @@ impl ProtocolPositionState {
         Ok(())
     }
 }
-
-
-/// Emitted pool liquidity change when increase and decrease liquidity
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct LiquidityChangeEvent {
-    /// The pool for swap
-    pub pool_state: Pubkey,
-
-    /// The liquidity of the pool before liquidity change
-    pub liquidity_before_0: u64,
-    /// The liquidity of the pool before liquidity change
-    pub liquidity_before_1: u64,
-
-    /// The liquidity of the pool after liquidity change
-    pub liquidity_after_0: u64,
-    /// The liquidity of the pool after liquidity change
-    pub liquidity_after_1: u64,
-}

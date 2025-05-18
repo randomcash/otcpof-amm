@@ -3,6 +3,7 @@ pub mod instructions;
 pub mod libraries;
 pub mod states;
 pub mod util;
+pub mod events;
 
 use anchor_lang::prelude::*;
 use core as core_;
@@ -56,7 +57,8 @@ pub mod amm_v3 {
         protocol_fee_rate: u32,
         fund_fee_rate: u32,
         queue_type_0: u8,
-        queue_type_1: u8
+        queue_type_1: u8,
+        price_feed_max_age: u64,
     ) -> Result<()> {
         assert!(trade_fee_rate < FEE_RATE_DENOMINATOR_VALUE);
         assert!(protocol_fee_rate <= FEE_RATE_DENOMINATOR_VALUE);
@@ -69,7 +71,8 @@ pub mod amm_v3 {
             protocol_fee_rate,
             fund_fee_rate,
             queue_type_0,
-            queue_type_1
+            queue_type_1,
+            price_feed_max_age
         )
     }
 
@@ -191,30 +194,17 @@ pub mod amm_v3 {
         instructions::close_position(ctx)
     }
 
-    /// #[deprecated(note = "Use `swap_v2` instead.")]
     /// Swaps one token for as much as possible of another token across a single pool
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context of accounts
-    /// * `amount` - Arranged in pairs with other_amount_threshold. (amount_in, amount_out_minimum) or (amount_out, amount_in_maximum)
-    /// * `other_amount_threshold` - For slippage check
-    /// * `sqrt_price_limit` - The Q64.64 sqrt price √P limit. If zero for one, the price cannot
-    /// * `is_base_input` - swap base input or swap base output
     ///
-    pub fn swap<'a, 'b, 'c: 'info, 'info>(
-        ctx: Context<'a, 'b, 'c, 'info, SwapSingle<'info>>,
-        amount: u64,
-        other_amount_threshold: u64,
-        sqrt_price_limit_x64: u128,
-        is_base_input: bool,
+    pub fn swap<>(
+        ctx: Context<Swap>,
     ) -> Result<()> {
         instructions::swap(
             ctx,
-            amount,
-            other_amount_threshold,
-            sqrt_price_limit_x64,
-            is_base_input,
         )
     }
 }

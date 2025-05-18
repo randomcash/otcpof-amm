@@ -129,25 +129,7 @@ impl Queue<Pubkey> for PoolQueue {
     }
 }
 
-/// Emitted when create a new position
-#[event]
-#[cfg_attr(feature = "client", derive(Debug))]
-pub struct PositionPushedToQueueEvent {
-    /// The pool for which liquidity was added
-    pub pool_id: Pubkey,
 
-    /// The address that create the position
-    pub minter: Pubkey,
-
-    /// The owner of the position and recipient of any minted liquidity
-    pub nft_owner: Pubkey,
-
-    /// Position address
-    pub position_address: Pubkey,
-
-    /// Position in queue
-    pub queue_position: u8,
-}
 
 #[cfg(test)]
 mod tests {

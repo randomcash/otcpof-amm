@@ -1,4 +1,5 @@
 use crate::error::ErrorCode;
+use crate::events::ConfigChangeEvent;
 use crate::states::*;
 use anchor_lang::prelude::*;
 
@@ -31,7 +32,8 @@ pub fn update_amm_config(ctx: Context<UpdateAmmConfig>, param: u8, value: u32) -
         Some(5) => {
             //TODO:
             todo!("implement queue type change when different types of queues are implemented")
-        }
+        },
+        Some(6) => update_price_feed_max_age(amm_config, value.into()),
         _ => return err!(ErrorCode::InvalidUpdateConfigFlag),
     }
 
@@ -43,7 +45,8 @@ pub fn update_amm_config(ctx: Context<UpdateAmmConfig>, param: u8, value: u32) -
         fund_fee_rate: amm_config.fund_fee_rate,
         fund_owner: amm_config.fund_owner,
         queue_type_0: amm_config.queue_type_0,
-        queue_type_1: amm_config.queue_type_1
+        queue_type_1: amm_config.queue_type_1,
+        price_feed_max_age: amm_config.price_feed_max_age
     });
 
     Ok(())
@@ -84,4 +87,8 @@ fn set_new_fund_owner(amm_config: &mut Account<AmmConfig>, new_fund_owner: Pubke
         new_fund_owner.key().to_string()
     );
     amm_config.fund_owner = new_fund_owner;
+}
+
+fn update_price_feed_max_age(amm_config: &mut Account<AmmConfig>, new_max_age: u64) {
+    amm_config.price_feed_max_age = new_max_age;
 }

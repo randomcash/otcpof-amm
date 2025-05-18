@@ -1,4 +1,5 @@
 use crate::error::ErrorCode;
+use crate::events::ConfigChangeEvent;
 use crate::libraries::QueueType;
 use crate::states::*;
 use anchor_lang::prelude::*;
@@ -37,7 +38,8 @@ pub fn create_amm_config(
     protocol_fee_rate: u32,
     fund_fee_rate: u32,
     queue_type_0: u8,
-    queue_type_1: u8
+    queue_type_1: u8,
+    price_feed_max_age: u64
 ) -> Result<()> {
     let amm_config = ctx.accounts.amm_config.deref_mut();
     amm_config.owner = ctx.accounts.owner.key();
@@ -49,6 +51,7 @@ pub fn create_amm_config(
     amm_config.fund_owner = ctx.accounts.owner.key();
     amm_config.queue_type_0 = QueueType::from(queue_type_0);
     amm_config.queue_type_1 = QueueType::from(queue_type_1);
+    amm_config.price_feed_max_age = price_feed_max_age;
 
     emit!(ConfigChangeEvent {
         index: amm_config.index,
@@ -58,7 +61,8 @@ pub fn create_amm_config(
         fund_fee_rate: amm_config.fund_fee_rate,
         fund_owner: amm_config.fund_owner,
         queue_type_0: amm_config.queue_type_0,
-        queue_type_1: amm_config.queue_type_1
+        queue_type_1: amm_config.queue_type_1,
+        price_feed_max_age: amm_config.price_feed_max_age
     });
 
     Ok(())
