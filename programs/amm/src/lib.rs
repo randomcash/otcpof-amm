@@ -34,6 +34,9 @@ pub mod admin {
     declare_id!("GThUX1Atko4tqhN2NaiTazWSeFWMuiUvfFnyJyUghFMJ");
 }
 
+pub const PYTH_PROGRAM_ID: Pubkey = pubkey!("FsSMpvcnNL7ewh2nCS5M1XsU1QUoAVDq4VpG7s1N4TxE");
+pub const ACCOUNT_DATA_LEN: u64 = 512;
+
 #[program]
 pub mod amm_v3 {
 

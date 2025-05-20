@@ -11,19 +11,16 @@ use anchor_client::solana_client::{
 };
 use anchor_client::{Client, Cluster};
 use anchor_lang::prelude::AccountMeta;
-use anchor_spl::{associated_token::spl_associated_token_account, token::{self, spl_token}};
+use anchor_spl::{associated_token::spl_associated_token_account, token::spl_token};
 use anyhow::{format_err, Result};
 use arrayref::array_ref;
+use borsh::{to_vec, BorshSerialize};
+use chrono::Utc;
 use clap::Parser;
 use configparser::ini::Ini;
-use raydium_amm_v3::libraries::Queue;
+use raydium_amm_v3::{libraries::Queue, ACCOUNT_DATA_LEN, PYTH_PROGRAM_ID};
 use solana_sdk::{
-    commitment_config::CommitmentConfig,
-    compute_budget::ComputeBudgetInstruction,
-    program_pack::Pack,
-    pubkey::Pubkey,
-    signature::{Keypair, Signature, Signer},
-    transaction::Transaction,
+    clock, commitment_config::CommitmentConfig, compute_budget::ComputeBudgetInstruction, instruction::Instruction, program_pack::Pack, pubkey::Pubkey, signature::{Keypair, Signature, Signer}, system_instruction, sysvar::Sysvar, transaction::Transaction
 };
 use solana_transaction_status::UiTransactionEncoding;
 use spl_token_client::{spl_token_2022, token::ExtensionInitializationParams};
@@ -44,7 +41,6 @@ use spl_token_client::spl_token_2022::{
     state::{Account, AccountState},
 };
 
-use crate::instructions::utils;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClientConfig {
     http_url: String,
@@ -68,6 +64,21 @@ pub struct PoolAccounts {
     pool_observation: Option<Pubkey>,
     pool_protocol_positions: Vec<Pubkey>,
     pool_personal_positions: Vec<Pubkey>,
+}
+#[repr(u32)]
+enum PythInstruction {
+    /// This isn't official; we mock an example layout
+    UpdatePrice = 0,
+}
+
+/// Mock instruction data
+#[derive(BorshSerialize)]
+struct UpdatePriceData {
+    instruction: u32, // PythInstruction::UpdatePrice
+    price: i64,       // mock price
+    confidence: u64,  // confidence interval
+    expo: i32,        // exponent (e.g., -6 for 0.000001)
+    publish_time: i64,
 }
 
 fn load_cfg(client_config: &String) -> Result<ClientConfig> {
@@ -306,7 +317,7 @@ pub enum CommandsName {
         fund_fee_rate: u32,
         queue_type_0: u8,
         queue_type_1: u8,
-        price_feed_max_age: u64
+        price_feed_max_age: u64,
     },
     UpdateConfig {
         config_index: u16,
@@ -318,6 +329,17 @@ pub enum CommandsName {
     UpdateOperation {
         param: u8,
         keys: Vec<Pubkey>,
+    },
+    CreatePriceFeed {
+        /// 1.200000 price
+        #[arg(long, default_value = "1200000")] 
+        price: i64,
+        /// 1.000000 confidence
+        #[arg(long, default_value = "1000000")] 
+        confidence: u64,
+        /// Exponent (e.g. -6 for 10^-6)
+        #[arg(long, default_value = "-6")]
+        expo: i32,
     },
     CreatePool {
         config_index: u16,
@@ -603,7 +625,7 @@ fn main() -> Result<()> {
             fund_fee_rate,
             queue_type_0,
             queue_type_1,
-            price_feed_max_age
+            price_feed_max_age,
         } => {
             let (create_instr, amm_config_key) = create_amm_config_instr(
                 &pool_config.clone(),
@@ -613,7 +635,7 @@ fn main() -> Result<()> {
                 fund_fee_rate,
                 queue_type_0,
                 queue_type_1,
-                price_feed_max_age
+                price_feed_max_age,
             )?;
             // send
             let signers = vec![&payer, &admin];
@@ -708,13 +730,65 @@ fn main() -> Result<()> {
             let signature = send_txn(&rpc_client, &txn, true)?;
             println!("signature: {}", signature);
         }
+        CommandsName::CreatePriceFeed { price, confidence, expo } => {
+            let price_feed = Keypair::new();
+            let lamports = rpc_client
+                .get_minimum_balance_for_rent_exemption(ACCOUNT_DATA_LEN.try_into().unwrap())?;
+
+            let create_ix = system_instruction::create_account(
+                &payer.pubkey(),
+                &price_feed.pubkey(),
+                lamports,
+                ACCOUNT_DATA_LEN,
+                &PYTH_PROGRAM_ID,
+            );
+
+            let tx = Transaction::new_signed_with_payer(
+                &[create_ix],
+                Some(&payer.pubkey()),
+                &[&payer, &price_feed],
+                rpc_client.get_latest_blockhash()?,
+            );
+
+            rpc_client.send_and_confirm_transaction(&tx)?;
+
+            let data = UpdatePriceData {
+                instruction: PythInstruction::UpdatePrice as u32,
+                price,
+                confidence,
+                expo,
+                publish_time: Utc::now().timestamp(),
+            };
+
+            let ix = Instruction {
+                program_id: PYTH_PROGRAM_ID,
+                accounts: vec![
+                    AccountMeta::new(price_feed.pubkey(), false),
+                    AccountMeta::new_readonly(payer.pubkey(), true),
+                ],
+                data: to_vec(&data).unwrap(),
+            };
+
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                rpc_client.get_latest_blockhash().unwrap(),
+            );
+
+            rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send price update");
+
+            println!("price_feed: {}", price_feed.pubkey());
+            println!("Price: {}", price);
+            println!("Confidence: {}", confidence);
+        }
         CommandsName::CreatePool {
             config_index,
             price,
             mint0,
             mint1,
+            price_feed,
             open_time,
-            price_feed
         } => {
             let mut price = price;
             let mut mint0 = mint0;
@@ -889,12 +963,11 @@ fn main() -> Result<()> {
             simulate,
         } => {
             let pool_state_account = rpc_client.get_account(&pool_address)?;
-            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(&pool_state_account)?;
+            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(
+                &pool_state_account,
+            )?;
 
-            let token_queue_accounts = vec![
-                pool_state.token_queue_0,
-                pool_state.token_queue_1
-            ];
+            let token_queue_accounts = vec![pool_state.token_queue_0, pool_state.token_queue_1];
             let rsps = rpc_client.get_multiple_accounts(&token_queue_accounts)?;
             let [token_queue_0_account, token_queue_1_account] = array_ref![rsps, 0, 2];
             let token_queue_0 = deserialize_anchor_account::<raydium_amm_v3::states::PoolQueue>(
@@ -910,7 +983,7 @@ fn main() -> Result<()> {
             let mut instructions = Vec::new();
             let request_inits_instr = ComputeBudgetInstruction::set_compute_unit_limit(1400_000u32);
             instructions.push(request_inits_instr);
-            
+
             let swap_instr = swap_instr(
                 &pool_config.clone(),
                 pool_state.amm_config,

@@ -1182,6 +1182,8 @@ dependencies = [
  "anyhow",
  "arrayref",
  "bincode 2.0.1",
+ "borsh 1.5.7",
+ "chrono",
  "clap 4.5.38",
  "colorful",
  "configparser",

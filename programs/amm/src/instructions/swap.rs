@@ -50,13 +50,13 @@ pub struct Swap<'info> {
     #[account(
         init_if_needed,
         seeds = [
-            POOL_QUEUE_SEED,
-            pool_state_loader.key().as_ref(),
-            POOL_QUEUE_SEED_SIDE_0
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_0,
+            pool_state_loader.key().as_ref()
         ],
         bump,
         payer = payer,
-        space = PoolQueue::LEN + 8
+        space = PoolQueue::LEN
     )]
     pub token_queue_0: AccountLoader<'info, PoolQueue>,
 
@@ -64,16 +64,17 @@ pub struct Swap<'info> {
     #[account(
         init_if_needed,
         seeds = [
-            POOL_QUEUE_SEED,
-            pool_state_loader.key().as_ref(),
-            POOL_QUEUE_SEED_SIDE_1
+            &POOL_QUEUE_SEED,
+            POOL_QUEUE_SEED_SIDE_1,
+            pool_state_loader.key().as_ref()
         ],
         bump,
         payer = payer,
-        space = PoolQueue::LEN + 8
+        space = PoolQueue::LEN
     )]
     pub token_queue_1: AccountLoader<'info, PoolQueue>,
 
+    /// CHECK: Verified manually
     #[account(
         constraint = price_feed.key() == pool_state_loader.load()?.price_feed
     )]
@@ -125,7 +126,10 @@ pub fn swap_v1<'a, 'info>(
     let mut head_0 = token_queue_0.has_next();
     let mut head_1 = token_queue_1.has_next();
     let price_feed = SolanaPriceAccount::account_info_to_feed(&price_feed)
-        .map_err(|_| ErrorCode::PriceFeedErr)?;
+        .map_err(|err| { 
+            msg!(&err.to_string());
+            ErrorCode::PriceFeedErr
+        })?;
 
     // Get the current price (optionally check status)
     let price = price_feed

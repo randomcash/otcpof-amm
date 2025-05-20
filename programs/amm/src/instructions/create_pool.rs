@@ -2,9 +2,11 @@ use crate::error::ErrorCode;
 use crate::events::PoolCreatedEvent;
 use crate::states::*;
 use crate::util;
+use crate::PYTH_PROGRAM_ID;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::clock;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+
 // use solana_program::{program::invoke_signed, system_instruction};
 #[derive(Accounts)]
 pub struct CreatePool<'info> {
@@ -101,8 +103,9 @@ pub struct CreatePool<'info> {
     )]
     pub observation_state: AccountLoader<'info, ObservationState>,
 
-    /// Which config the pool belongs to.
-    pub price_feed: Box<Account<'info, AmmConfig>>,
+    /// CHECK: must be an Pyth oracle
+    #[account(owner = PYTH_PROGRAM_ID)]
+    pub price_feed: AccountInfo<'info>,
 
     /// CHECK: loaded manually depending on queue type defined by AmmConfig
     #[account(
