@@ -5,16 +5,16 @@ use anchor_spl::associated_token::spl_associated_token_account;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
 use anyhow::Result;
-use raydium_amm_v3::states::POOL_QUEUE_SEED;
-use raydium_amm_v3::states::POOL_QUEUE_SEED_SIDE_0;
-use raydium_amm_v3::states::POOL_QUEUE_SEED_SIDE_1;
+use otcpof_amm::states::POOL_QUEUE_SEED;
+use otcpof_amm::states::POOL_QUEUE_SEED_SIDE_0;
+use otcpof_amm::states::POOL_QUEUE_SEED_SIDE_1;
 use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Signer, system_program, sysvar,
 };
 
-use raydium_amm_v3::accounts as raydium_accounts;
-use raydium_amm_v3::instruction as raydium_instruction;
-use raydium_amm_v3::states::{
+use otcpof_amm::accounts as raydium_accounts;
+use otcpof_amm::instruction as raydium_instruction;
+use otcpof_amm::states::{
     AMM_CONFIG_SEED, OBSERVATION_SEED, OPERATION_SEED, POOL_SEED, POOL_VAULT_SEED, POSITION_SEED,
 };
 use std::rc::Rc;

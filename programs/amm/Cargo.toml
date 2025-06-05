@@ -7,7 +7,7 @@ keywords = ["solana", "anchor"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "raydium_amm_v3"
+name = "otcpof_amm"
 doctest = false
 
 [features]

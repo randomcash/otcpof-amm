@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::libraries::{Queue, QueueType};
 use crate::error::ErrorCode;
 
-pub const MAX_ORDER_LIMIT: usize = 128;
+pub const MAX_ORDER_LIMIT: usize = 64;
 
 pub const POOL_QUEUE_SEED: &[u8] = b"pool_queue";
 pub const POOL_QUEUE_SEED_SIDE_0: &[u8] = &[0b0];

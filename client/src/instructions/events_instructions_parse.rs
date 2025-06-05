@@ -4,8 +4,8 @@ use anchor_lang::Discriminator;
 use anyhow::Result;
 use colorful::Color;
 use colorful::Colorful;
-use raydium_amm_v3::events::*;
-use raydium_amm_v3::instruction;
+use otcpof_amm::events::*;
+use otcpof_amm::instruction;
 use regex::Regex;
 use solana_sdk::bs58;
 use solana_transaction_status::{

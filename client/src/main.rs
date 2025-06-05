@@ -18,9 +18,9 @@ use borsh::{to_vec, BorshSerialize};
 use chrono::Utc;
 use clap::Parser;
 use configparser::ini::Ini;
-use raydium_amm_v3::{libraries::Queue, ACCOUNT_DATA_LEN, PYTH_PROGRAM_ID};
+use otcpof_amm::{libraries::Queue, ACCOUNT_DATA_LEN, PYTH_PROGRAM_ID};
 use solana_sdk::{
-    clock, commitment_config::CommitmentConfig, compute_budget::ComputeBudgetInstruction, instruction::Instruction, program_pack::Pack, pubkey::Pubkey, signature::{Keypair, Signature, Signer}, system_instruction, sysvar::Sysvar, transaction::Transaction
+    commitment_config::CommitmentConfig, compute_budget::ComputeBudgetInstruction, instruction::Instruction, program_pack::Pack, pubkey::Pubkey, signature::{Keypair, Signature, Signer}, system_instruction, transaction::Transaction
 };
 use solana_transaction_status::UiTransactionEncoding;
 use spl_token_client::{spl_token_2022, token::ExtensionInitializationParams};
@@ -122,7 +122,7 @@ fn load_cfg(client_config: &String) -> Result<ClientConfig> {
 
     let (amm_config_key, __bump) = Pubkey::find_program_address(
         &[
-            raydium_amm_v3::states::AMM_CONFIG_SEED.as_bytes(),
+            otcpof_amm::states::AMM_CONFIG_SEED.as_bytes(),
             &amm_config_index.to_be_bytes(),
         ],
         &raydium_v3_program,
@@ -137,7 +137,7 @@ fn load_cfg(client_config: &String) -> Result<ClientConfig> {
         Some(
             Pubkey::find_program_address(
                 &[
-                    raydium_amm_v3::states::POOL_SEED.as_bytes(),
+                    otcpof_amm::states::POOL_SEED.as_bytes(),
                     amm_config_key.to_bytes().as_ref(),
                     mint0.unwrap().to_bytes().as_ref(),
                     mint1.unwrap().to_bytes().as_ref(),
@@ -188,19 +188,19 @@ struct PositionNftTokenInfo {
 fn get_all_nft_and_position_by_owner(
     client: &RpcClient,
     owner: &Pubkey,
-    raydium_amm_v3_program: &Pubkey,
+    otcpof_amm_program: &Pubkey,
 ) -> Vec<PositionNftTokenInfo> {
     let mut spl_nfts = get_nft_account_and_position_by_owner(
         client,
         owner,
         spl_token::id(),
-        raydium_amm_v3_program,
+        otcpof_amm_program,
     );
     let spl_2022_nfts = get_nft_account_and_position_by_owner(
         client,
         owner,
         spl_token_2022::id(),
-        raydium_amm_v3_program,
+        otcpof_amm_program,
     );
     spl_nfts.extend(spl_2022_nfts);
     spl_nfts
@@ -209,7 +209,7 @@ fn get_nft_account_and_position_by_owner(
     client: &RpcClient,
     owner: &Pubkey,
     token_program: Pubkey,
-    raydium_amm_v3_program: &Pubkey,
+    otcpof_amm_program: &Pubkey,
 ) -> Vec<PositionNftTokenInfo> {
     let all_tokens = client
         .get_token_accounts_by_owner(owner, TokenAccountsFilter::ProgramId(token_program))
@@ -245,10 +245,10 @@ fn get_nft_account_and_position_by_owner(
                     if ui_token_account.token_amount.decimals == 0 && token_amount == 1 {
                         let (position_pda, _) = Pubkey::find_program_address(
                             &[
-                                raydium_amm_v3::states::POSITION_SEED.as_bytes(),
+                                otcpof_amm::states::POSITION_SEED.as_bytes(),
                                 token.to_bytes().as_ref(),
                             ],
-                            &raydium_amm_v3_program,
+                            &otcpof_amm_program,
                         );
                         position_nft_accounts.push(PositionNftTokenInfo {
                             key: token_account,
@@ -678,7 +678,7 @@ fn main() -> Result<()> {
             }
             let (amm_config_key, __bump) = Pubkey::find_program_address(
                 &[
-                    raydium_amm_v3::states::AMM_CONFIG_SEED.as_bytes(),
+                    otcpof_amm::states::AMM_CONFIG_SEED.as_bytes(),
                     &config_index.to_be_bytes(),
                 ],
                 &pool_config.raydium_v3_program,
@@ -810,7 +810,7 @@ fn main() -> Result<()> {
                 price_to_sqrt_price_x64(price, mint0_account.decimals, mint1_account.decimals);
             let (amm_config_key, __bump) = Pubkey::find_program_address(
                 &[
-                    raydium_amm_v3::states::AMM_CONFIG_SEED.as_bytes(),
+                    otcpof_amm::states::AMM_CONFIG_SEED.as_bytes(),
                     &config_index.to_be_bytes(),
                 ],
                 &pool_config.raydium_v3_program,
@@ -847,7 +847,7 @@ fn main() -> Result<()> {
             with_metadata,
         } => {
             // load pool to get observation
-            let pool: raydium_amm_v3::states::PoolState = program.account(pool_address)?;
+            let pool: otcpof_amm::states::PoolState = program.account(pool_address)?;
             println!("amount_0:{}, amount_1:{}", amount_0, amount_1);
             // calc with slippage
             let amount_0_with_slippage =
@@ -890,14 +890,14 @@ fn main() -> Result<()> {
                     None => continue,
                     Some(rsp) => {
                         let position = deserialize_anchor_account::<
-                            raydium_amm_v3::states::PersonalPositionState,
+                            otcpof_amm::states::PersonalPositionState,
                         >(&rsp)?;
                         user_positions.push(position);
                     }
                 }
             }
 
-            /*let mut find_position = raydium_amm_v3::states::PersonalPositionState::default();
+            /*let mut find_position = otcpof_amm::states::PersonalPositionState::default();
             for position in user_positions {
                 if position.pool_id == pool_address {
                     find_position = position.clone();
@@ -963,17 +963,17 @@ fn main() -> Result<()> {
             simulate,
         } => {
             let pool_state_account = rpc_client.get_account(&pool_address)?;
-            let pool_state = deserialize_anchor_account::<raydium_amm_v3::states::PoolState>(
+            let pool_state = deserialize_anchor_account::<otcpof_amm::states::PoolState>(
                 &pool_state_account,
             )?;
 
             let token_queue_accounts = vec![pool_state.token_queue_0, pool_state.token_queue_1];
             let rsps = rpc_client.get_multiple_accounts(&token_queue_accounts)?;
             let [token_queue_0_account, token_queue_1_account] = array_ref![rsps, 0, 2];
-            let token_queue_0 = deserialize_anchor_account::<raydium_amm_v3::states::PoolQueue>(
+            let token_queue_0 = deserialize_anchor_account::<otcpof_amm::states::PoolQueue>(
                 &token_queue_0_account.as_ref().unwrap(),
             )?;
-            let token_queue_1 = deserialize_anchor_account::<raydium_amm_v3::states::PoolQueue>(
+            let token_queue_1 = deserialize_anchor_account::<otcpof_amm::states::PoolQueue>(
                 &token_queue_1_account.as_ref().unwrap(),
             )?;
 
@@ -1033,11 +1033,11 @@ fn main() -> Result<()> {
                     None => continue,
                     Some(rsp) => {
                         let position = deserialize_anchor_account::<
-                            raydium_amm_v3::states::PersonalPositionState,
+                            otcpof_amm::states::PersonalPositionState,
                         >(&rsp)?;
                         let (personal_position_key, __bump) = Pubkey::find_program_address(
                             &[
-                                raydium_amm_v3::states::POSITION_SEED.as_bytes(),
+                                otcpof_amm::states::POSITION_SEED.as_bytes(),
                                 position.nft_mint.to_bytes().as_ref(),
                             ],
                             &program.id(),
@@ -1075,32 +1075,32 @@ fn main() -> Result<()> {
         }
         CommandsName::POperation => {
             let (operation_account_key, __bump) = Pubkey::find_program_address(
-                &[raydium_amm_v3::states::OPERATION_SEED.as_bytes()],
+                &[otcpof_amm::states::OPERATION_SEED.as_bytes()],
                 &program.id(),
             );
             println!("{}", operation_account_key);
-            let operation_account: raydium_amm_v3::states::OperationState =
+            let operation_account: otcpof_amm::states::OperationState =
                 program.account(operation_account_key)?;
             println!("{:#?}", operation_account);
         }
         CommandsName::PObservation => {
-            let pool: raydium_amm_v3::states::PoolState =
+            let pool: otcpof_amm::states::PoolState =
                 program.account(pool_config.pool_id_account.unwrap())?;
             println!("{}", pool.observation_key);
-            let observation_account: raydium_amm_v3::states::ObservationState =
+            let observation_account: otcpof_amm::states::ObservationState =
                 program.account(pool.observation_key)?;
             println!("{:#?}", observation_account);
         }
         CommandsName::PConfig { config_index } => {
             let (amm_config_key, __bump) = Pubkey::find_program_address(
                 &[
-                    raydium_amm_v3::states::AMM_CONFIG_SEED.as_bytes(),
+                    otcpof_amm::states::AMM_CONFIG_SEED.as_bytes(),
                     &config_index.to_be_bytes(),
                 ],
                 &program.id(),
             );
             println!("{}", amm_config_key);
-            let amm_config_account: raydium_amm_v3::states::AmmConfig =
+            let amm_config_account: otcpof_amm::states::AmmConfig =
                 program.account(amm_config_key)?;
             println!("{:#?}", amm_config_account);
         }
@@ -1120,7 +1120,7 @@ fn main() -> Result<()> {
                             &pool_id.to_bytes(),
                         )),
                         RpcFilterType::DataSize(
-                            raydium_amm_v3::states::PersonalPositionState::LEN as u64,
+                            otcpof_amm::states::PersonalPositionState::LEN as u64,
                         ),
                     ]),
                     account_config: RpcAccountInfoConfig {
@@ -1134,7 +1134,7 @@ fn main() -> Result<()> {
 
             for position in position_accounts_by_pool {
                 let personal_position = deserialize_anchor_account::<
-                    raydium_amm_v3::states::PersonalPositionState,
+                    otcpof_amm::states::PersonalPositionState,
                 >(&position.1)?;
                 if personal_position.pool_id == pool_id {
                     println!(
@@ -1160,7 +1160,7 @@ fn main() -> Result<()> {
                             &pool_id.to_bytes(),
                         )),
                         RpcFilterType::DataSize(
-                            raydium_amm_v3::states::ProtocolPositionState::LEN as u64,
+                            otcpof_amm::states::ProtocolPositionState::LEN as u64,
                         ),
                     ]),
                     account_config: RpcAccountInfoConfig {
@@ -1174,7 +1174,7 @@ fn main() -> Result<()> {
 
             for position in position_accounts_by_pool {
                 let protocol_position = deserialize_anchor_account::<
-                    raydium_amm_v3::states::ProtocolPositionState,
+                    otcpof_amm::states::ProtocolPositionState,
                 >(&position.1)?;
                 let liquidity_0 = protocol_position.liquidity_0;
                 let liquidity_1 = protocol_position.liquidity_1;
@@ -1193,16 +1193,16 @@ fn main() -> Result<()> {
                 pool_config.pool_id_account.unwrap()
             };
             println!("pool_id:{}", pool_id);
-            let pool_account: raydium_amm_v3::states::PoolState = program.account(pool_id)?;
+            let pool_account: otcpof_amm::states::PoolState = program.account(pool_id)?;
             println!("{:#?}", pool_account);
         }
         CommandsName::PProtocol { protocol_id } => {
-            let protocol_account: raydium_amm_v3::states::ProtocolPositionState =
+            let protocol_account: otcpof_amm::states::ProtocolPositionState =
                 program.account(protocol_id)?;
             println!("{:#?}", protocol_account);
         }
         CommandsName::PPersonal { personal_id } => {
-            let personal_account: raydium_amm_v3::states::PersonalPositionState =
+            let personal_account: otcpof_amm::states::PersonalPositionState =
                 program.account(personal_id)?;
             println!("{:#?}", personal_account);
         }
