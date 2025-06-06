@@ -1,5 +1,5 @@
 [package]
-name = "raydium-amm-v3"
+name = "otcpof-amm"
 version = "0.1.0"
 description = "Anchor client and source for Raydium concentrated liquidity AMM"
 edition = "2021"

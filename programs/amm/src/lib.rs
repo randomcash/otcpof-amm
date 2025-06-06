@@ -38,7 +38,7 @@ pub const PYTH_PROGRAM_ID: Pubkey = pubkey!("FsSMpvcnNL7ewh2nCS5M1XsU1QUoAVDq4Vp
 pub const ACCOUNT_DATA_LEN: u64 = 512;
 
 #[program]
-pub mod amm_v3 {
+pub mod otcpof_amm {
 
     use super::*;
 

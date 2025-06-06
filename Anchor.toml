@@ -7,7 +7,7 @@ seeds = false
 otcpof_amm = "HAccqG6fn1hKPG39bTmZQVXj5cbFfwEJ7YMufzLJwq1c"
 
 [registry]
-url = "https://github.com/raydium-io/raydium-amm-v3"
+url = ""
 
 [provider]
 cluster = "localnet"

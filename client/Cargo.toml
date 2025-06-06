@@ -10,7 +10,7 @@ anchor-spl = { version = "0.31.1", features = ["metadata"] }
 anyhow = "1.0.32"
 proc-macro2 = "1.0.94"
 pyth-sdk-solana = "0.10.4"
-raydium-amm-v3 = {path = "../programs/amm", features = ["no-entrypoint", "client"]}
+otcpof-amm = {path = "../programs/amm", features = ["no-entrypoint", "client"]}
 solana-sdk = { version = "2.2.2", features = ["full"] }
 spl-memo = "6.0.0"
 uint = { git = "https://github.com/raydium-io/parity-common", package = "uint" }
